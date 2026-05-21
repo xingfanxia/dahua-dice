@@ -11,12 +11,15 @@ import type { Face, RoomState } from '@/lib/game-engine/types';
 
 export const runtime = 'nodejs';
 
+import type { GameRules } from '@/lib/game-engine/types';
+
 type Action =
   | { type: 'join'; code: string; nick: string; avatar?: string }
   | { type: 'start'; code: string }
   | { type: 'roll'; code: string }
   | { type: 'bid'; code: string; count: number; face: Face; isZhai: boolean; expectedVersion: number }
-  | { type: 'challenge'; code: string; expectedVersion: number };
+  | { type: 'challenge'; code: string; expectedVersion: number }
+  | { type: 'updateRules'; code: string; rules: GameRules };
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as Action;
@@ -96,6 +99,31 @@ export async function POST(req: NextRequest) {
     case 'challenge': {
       const result = await runScript('challenge', [stateKey], [session.playerId, String(body.expectedVersion)]);
       return NextResponse.json(result);
+    }
+    case 'updateRules': {
+      const state = await redis.get<RoomState>(stateKey);
+      if (!state) return NextResponse.json({ ok: false, reason: 'no_room' }, { status: 404 });
+      if (state.ownerId !== session.playerId) {
+        return NextResponse.json({ ok: false, reason: 'not_owner' }, { status: 403 });
+      }
+      if (state.phase !== 'lobby') {
+        return NextResponse.json({ ok: false, reason: 'wrong_phase' }, { status: 400 });
+      }
+      const updated: RoomState = {
+        ...state,
+        rules: body.rules,
+        players: state.players.map((p) => ({ ...p, diceLeft: body.rules.diceCount })),
+        version: state.version + 1,
+      };
+      await redis.set(stateKey, updated, { ex: 21600 });
+      const payload = JSON.stringify({
+        type: 'rules_updated',
+        payload: { rules: body.rules },
+        version: updated.version,
+      });
+      await redis.xadd(`room:${code}:events`, '*', { data: payload });
+      await redis.publish(`room:${code}:events`, payload);
+      return NextResponse.json({ ok: true, version: updated.version });
     }
     default:
       return NextResponse.json({ ok: false, reason: 'unknown_action' }, { status: 400 });

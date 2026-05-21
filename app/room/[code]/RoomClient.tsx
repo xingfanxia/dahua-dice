@@ -10,7 +10,8 @@ import { BidPanel } from '@/components/game/BidPanel';
 import { PlayerRing } from '@/components/game/PlayerRing';
 import { BidChain } from '@/components/game/BidChain';
 import { RevealStage } from '@/components/game/RevealStage';
-import type { RoomState } from '@/lib/game-engine/types';
+import { CustomizationDrawer } from '@/components/customization/CustomizationDrawer';
+import type { GameRules, RoomState } from '@/lib/game-engine/types';
 
 export function RoomClient({
   initialState,
@@ -90,6 +91,16 @@ export function RoomClient({
 
   const isOwner = state.ownerId === myPlayerId;
   const canStart = isOwner && state.players.length >= 2 && state.phase === 'lobby';
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { setTheme } = useTheme();
+
+  async function handleSaveRules(rules: GameRules) {
+    await fetch('/api/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'updateRules', code, rules }),
+    });
+  }
 
   return (
     <main className="min-h-[100dvh] safe-top safe-bottom flex flex-col px-4 py-6 gap-6 max-w-md mx-auto w-full">
@@ -103,18 +114,33 @@ export function RoomClient({
             {code}
           </h1>
         </div>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="text-sm px-3 py-2 rounded-lg transition-colors"
-          style={{
-            backgroundColor: tokens.colors.surface,
-            color: tokens.colors.primary,
-            border: `1px solid ${tokens.colors.primary}55`,
-          }}
-        >
-          {copied ? t('lobby.copied') : t('lobby.copyCode')}
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="text-sm px-3 py-2 rounded-lg transition-colors"
+            style={{
+              backgroundColor: tokens.colors.surface,
+              color: tokens.colors.primary,
+              border: `1px solid ${tokens.colors.primary}55`,
+            }}
+          >
+            {copied ? t('lobby.copied') : t('lobby.copyCode')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            className="text-sm px-3 py-2 rounded-lg transition-colors"
+            style={{
+              backgroundColor: tokens.colors.surface,
+              color: tokens.colors.text,
+              border: `1px solid ${tokens.colors.textMuted}33`,
+            }}
+            aria-label="settings"
+          >
+            ⚙
+          </button>
+        </div>
       </div>
 
       <hr style={{ borderColor: tokens.colors.textMuted + '33' }} />
@@ -133,6 +159,16 @@ export function RoomClient({
       ) : (
         <GameView state={state} myPlayerId={myPlayerId} code={code} />
       )}
+
+      <CustomizationDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        rules={state.rules}
+        onSaveRules={handleSaveRules}
+        isOwner={isOwner}
+        currentTheme={state.theme as 'modern-minimal' | 'classic-bar' | 'hk-neon' | 'cartoon'}
+        onSwitchTheme={setTheme}
+      />
     </main>
   );
 }
