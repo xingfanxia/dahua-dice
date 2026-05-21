@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { useRoomEvents } from '@/components/game/useRoomEvents';
+import { DiceScene, type DicePhase } from '@/components/dice/DiceScene';
 import type { RoomState } from '@/lib/game-engine/types';
 
 export function RoomClient({
@@ -231,18 +232,82 @@ function LobbyView({
 function GameView({ state, myPlayerId }: { state: RoomState; myPlayerId: string | null }) {
   const t = useTranslations();
   const { tokens } = useTheme();
+  const [hand, setHand] = useState<number[] | null>(null);
+  const [peeking, setPeeking] = useState(false);
+
+  // Fetch my hand when in rolling/bidding/reveal phase
+  useEffect(() => {
+    if (state.phase !== 'rolling' && state.phase !== 'bidding' && state.phase !== 'reveal') return;
+    fetch(`/api/hand/${state.code}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setHand(d.hand);
+      })
+      .catch(() => null);
+  }, [state.phase, state.code, state.round]);
+
+  // Map server phase → DiceScene phase
+  const dicePhase: DicePhase =
+    state.phase === 'lobby'
+      ? 'idle'
+      : state.phase === 'rolling'
+        ? 'rolling'
+        : state.phase === 'reveal'
+          ? 'revealed'
+          : 'settled';
+
+  const myPlayer = state.players.find((p) => p.id === myPlayerId);
+  const diceCount = myPlayer?.diceLeft ?? state.rules.diceCount;
+
   return (
-    <section className="flex-1 flex flex-col items-center justify-center gap-4">
-      <p className="text-sm uppercase tracking-wide" style={{ color: tokens.colors.textMuted }}>
-        {t(`game.${state.phase === 'rolling' ? 'rollingPhase' : state.phase === 'bidding' ? 'biddingPhase' : 'revealPhase'}`)}
-      </p>
-      <p className="text-2xl" style={{ color: tokens.colors.text }}>
-        {t('game.round', { n: state.round })}
-      </p>
-      <p className="text-sm" style={{ color: tokens.colors.textMuted }}>
-        (3D dice scene coming in Phase 6)
-      </p>
-      <p className="text-xs" style={{ color: tokens.colors.textMuted }}>
+    <section className="flex-1 flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs uppercase tracking-wide" style={{ color: tokens.colors.textMuted }}>
+          {t(
+            `game.${
+              state.phase === 'rolling'
+                ? 'rollingPhase'
+                : state.phase === 'bidding'
+                  ? 'biddingPhase'
+                  : 'revealPhase'
+            }`,
+          )}
+        </p>
+        <p className="text-sm" style={{ color: tokens.colors.text }}>
+          {t('game.round', { n: state.round })}
+        </p>
+      </div>
+
+      {/* 3D dice scene */}
+      <div
+        className="aspect-square rounded-2xl overflow-hidden"
+        style={{ backgroundColor: tokens.colors.surface }}
+      >
+        <DiceScene diceCount={diceCount} phase={dicePhase} />
+      </div>
+
+      {/* Peek hand */}
+      {hand && (
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onMouseDown={() => setPeeking(true)}
+            onMouseUp={() => setPeeking(false)}
+            onTouchStart={() => setPeeking(true)}
+            onTouchEnd={() => setPeeking(false)}
+            className="py-3 rounded-xl text-sm font-medium select-none"
+            style={{
+              backgroundColor: tokens.colors.surface,
+              color: tokens.colors.primary,
+              border: `1px solid ${tokens.colors.primary}55`,
+            }}
+          >
+            {peeking ? '🎲 ' + hand.join(' · ') : t('game.peekHand')}
+          </button>
+        </div>
+      )}
+
+      <p className="text-xs text-center" style={{ color: tokens.colors.textMuted }}>
         you: {myPlayerId?.slice(0, 8) ?? '—'}
       </p>
     </section>

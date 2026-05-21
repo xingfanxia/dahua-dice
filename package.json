@@ -36,6 +36,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "^0.184.1",
+    "@vitest/coverage-v8": "^4.1.7",
     "@vitest/ui": "^4.1.7",
     "happy-dom": "^20.9.0",
     "tailwindcss": "^4",
