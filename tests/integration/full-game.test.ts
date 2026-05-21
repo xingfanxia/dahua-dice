@@ -42,14 +42,14 @@ describe('full-game integration', () => {
       [6, 6, 6, 6, 6],
     ];
 
-    // Alice bids 3 × 4
-    const bid1: Bid = { count: 3, face: 4, isZhai: false };
+    // Alice opens with 5 × 4 (3 alive players → starting threshold = ceil(1.5*3) = 5)
+    const bid1: Bid = { count: 5, face: 4, isZhai: false };
     const v1 = isValidBid(state.lastBid, bid1, state.rules, 3);
     expect(v1.ok).toBe(true);
     state = { ...state, lastBid: bid1, currentTurnIdx: 1, version: state.version + 1 };
 
-    // Bob bids 4 × 4
-    const bid2: Bid = { count: 4, face: 4, isZhai: false };
+    // Bob bids 6 × 4
+    const bid2: Bid = { count: 6, face: 4, isZhai: false };
     const v2 = isValidBid(state.lastBid, bid2, state.rules, 3);
     expect(v2.ok).toBe(true);
     state = { ...state, lastBid: bid2, currentTurnIdx: 2, version: state.version + 1 };
@@ -58,10 +58,10 @@ describe('full-game integration', () => {
     state = applyTransition(state, { type: 'challenge', challengerIdx: 2 });
     expect(state.phase).toBe('reveal');
 
-    // Resolve: actual native 4s = 2 (Alice) + 1 (Bob) = 3; wild ones = 1+1+0 = 2; total = 5
-    // bid was 4 → actual 5 >= 4 → challenger (Cory) loses
+    // Resolve: actual native 4s = 2 (Alice) + 1 (Bob) = 3; wild ones = 2+1+0 = 3; total = 6
+    // bid was 6 → actual 6 >= 6 → challenger (Cory) loses
     const result = resolveChallenge(state.lastBid!, hands, state.rules, 2, 1);
-    expect(result.actualCount).toBe(5);
+    expect(result.actualCount).toBe(6);
     expect(result.loserIdx).toBe(2);
 
     state = applyTransition(state, { type: 'resolve', result });
