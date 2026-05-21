@@ -117,14 +117,23 @@ docs/                 # specs / plans / research (all written before code)
 messages/             # zh-CN.json + en.json (~78 keys)
 ```
 
+## Audio sprites
+
+Generated via ffmpeg synthesis (no external assets). 4 themes × 2 formats at `public/audio/{modern,classic,hk,cartoon}.{mp3,webm}`. Total ~340KB across all themes.
+
+- **Regenerate**: `node scripts/audio/generate-sprites.mjs`
+- **Smoke-test** (browser decode + duration drift check): `node scripts/audio/smoke.mjs` (needs `pnpm dev` running)
+- **Sprite map** (hardcoded in `lib/audio/useDiceAudio.ts`): collide[0,200] / shake[200,1200,loop] / reveal[1400,800] / win[2200,1000] / lose[3200,1000] / click[4200,100], total 4300ms
+- **Quality bar**: demo-grade synthesized SFX (sine sweeps + filtered noise + tremolo). Distinct per-theme palette but not "polished CC0". Swap in real Freesound CC0 files by replacing per-segment recipes in the generator script with `-i <path>.wav` inputs.
+
 ## Open items (out of MVP scope — pickup in next session)
 
 1. **Vercel SSO wall** — toggle Deployment Protection off in dashboard for public access
-2. **Audio sprites** — generate audiosprite mp3+json for 4 themes (sources in `docs/research/dice-audio-research.md`)
-3. **Real-device gyro test** — need iPhone 14 Pro + Pixel 7 / Android for DeviceMotion validation
-4. **Playwright e2e tests** — config exists, write happy-path + reconnect tests (skeleton in plan Phase 12)
-5. **Per-theme dice materials** — currently all themes use the same BoxGeometry + SVG pips; design spec calls for distinct materials (frosted glass / ivory / enamel / pastel ceramic) via shaders or texture maps
-6. **Player avatar picker UI** — `avatar` field exists in Player schema but no picker UI yet; default is `numeric`
+2. **Real-device gyro test** — need iPhone 14 Pro + Pixel 7 / Android for DeviceMotion validation
+3. **Playwright e2e tests** — config exists, write happy-path + reconnect tests (skeleton in plan Phase 12)
+4. **Per-theme dice materials** — currently all themes use the same BoxGeometry + SVG pips; design spec calls for distinct materials (frosted glass / ivory / enamel / pastel ceramic) via shaders or texture maps
+5. **Player avatar picker UI** — `avatar` field exists in Player schema but no picker UI yet; default is `numeric`
+6. **Polished audio assets** — swap demo-grade synth SFX for curated Freesound CC0 + ElevenLabs AI generated stems (see §F of `docs/research/dice-audio-research.md`)
 
 ## Reference docs
 
