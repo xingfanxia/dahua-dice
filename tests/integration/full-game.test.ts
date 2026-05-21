@@ -58,14 +58,14 @@ describe('full-game integration', () => {
     state = applyTransition(state, { type: 'challenge', challengerIdx: 2 });
     expect(state.phase).toBe('reveal');
 
-    // Resolve: actual native 4s = 2 (Alice) + 1 (Bob) = 3; wild ones = 2+1+0 = 3; total = 6
-    // bid was 6 → actual 6 >= 6 → challenger (Cory) loses
+    // Resolve: actual native 4s = 2 (Alice) + 1 (Bob) = 3; wild ones = 1 (Alice) + 1 (Bob) = 2; total = 5
+    // bid was 6 → actual 5 < 6 → BIDDER (Bob = idx 1) loses
     const result = resolveChallenge(state.lastBid!, hands, state.rules, 2, 1);
-    expect(result.actualCount).toBe(6);
-    expect(result.loserIdx).toBe(2);
+    expect(result.actualCount).toBe(5);
+    expect(result.loserIdx).toBe(1);
 
     state = applyTransition(state, { type: 'resolve', result });
-    expect(state.players[2].diceLeft).toBe(4);
+    expect(state.players[1].diceLeft).toBe(4);
     expect(state.phase).toBe('round_end');
   });
 
