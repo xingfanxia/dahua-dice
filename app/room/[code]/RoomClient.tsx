@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useTheme } from '@/components/theme/ThemeProvider';
+import { useRoomEvents } from '@/components/game/useRoomEvents';
 import type { RoomState } from '@/lib/game-engine/types';
 
 export function RoomClient({
@@ -35,18 +36,27 @@ export function RoomClient({
       .catch(() => null);
   }, [code]);
 
-  // Poll state every 2s (Phase 4 will replace with SSE)
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/room/${code}/full`, { cache: 'no-store' });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.ok && data.state) setState(data.state);
-      } catch {}
-    }, 2000);
-    return () => clearInterval(interval);
+  // SSE-driven sync: on any room event, refetch the full state
+  const refetch = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/room/${code}/full`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.ok && data.state) {
+        setState((prev) => (data.state.version > prev.version ? data.state : prev));
+      }
+    } catch {}
   }, [code]);
+
+  useRoomEvents(code, () => {
+    refetch();
+  });
+
+  // Safety-net polling (every 10s) in case SSE drops
+  useEffect(() => {
+    const interval = setInterval(refetch, 10000);
+    return () => clearInterval(interval);
+  }, [refetch]);
 
   async function handleCopy() {
     try {
