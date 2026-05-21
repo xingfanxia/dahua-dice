@@ -6,6 +6,10 @@ import { useTranslations } from 'next-intl';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { useRoomEvents } from '@/components/game/useRoomEvents';
 import { DiceScene, type DicePhase } from '@/components/dice/DiceScene';
+import { BidPanel } from '@/components/game/BidPanel';
+import { PlayerRing } from '@/components/game/PlayerRing';
+import { BidChain } from '@/components/game/BidChain';
+import { RevealStage } from '@/components/game/RevealStage';
 import type { RoomState } from '@/lib/game-engine/types';
 
 export function RoomClient({
@@ -127,7 +131,7 @@ export function RoomClient({
           myPlayerId={myPlayerId}
         />
       ) : (
-        <GameView state={state} myPlayerId={myPlayerId} />
+        <GameView state={state} myPlayerId={myPlayerId} code={code} />
       )}
     </main>
   );
@@ -229,13 +233,23 @@ function LobbyView({
   );
 }
 
-function GameView({ state, myPlayerId }: { state: RoomState; myPlayerId: string | null }) {
+function GameView({
+  state,
+  myPlayerId,
+  code,
+}: {
+  state: RoomState;
+  myPlayerId: string | null;
+  code: string;
+}) {
   const t = useTranslations();
   const { tokens } = useTheme();
   const [hand, setHand] = useState<number[] | null>(null);
+  const [allHands, setAllHands] = useState<Record<string, number[]> | null>(null);
   const [peeking, setPeeking] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  // Fetch my hand when in rolling/bidding/reveal phase
+  // Fetch my hand when game running
   useEffect(() => {
     if (state.phase !== 'rolling' && state.phase !== 'bidding' && state.phase !== 'reveal') return;
     fetch(`/api/hand/${state.code}`)
@@ -246,7 +260,20 @@ function GameView({ state, myPlayerId }: { state: RoomState; myPlayerId: string 
       .catch(() => null);
   }, [state.phase, state.code, state.round]);
 
-  // Map server phase → DiceScene phase
+  // Fetch all hands on reveal
+  useEffect(() => {
+    if (state.phase !== 'reveal') {
+      setAllHands(null);
+      return;
+    }
+    fetch(`/api/room/${state.code}/all-hands`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setAllHands(d.hands);
+      })
+      .catch(() => null);
+  }, [state.phase, state.code]);
+
   const dicePhase: DicePhase =
     state.phase === 'lobby'
       ? 'idle'
@@ -258,58 +285,101 @@ function GameView({ state, myPlayerId }: { state: RoomState; myPlayerId: string 
 
   const myPlayer = state.players.find((p) => p.id === myPlayerId);
   const diceCount = myPlayer?.diceLeft ?? state.rules.diceCount;
+  const isMyTurn = state.players[state.currentTurnIdx]?.id === myPlayerId;
+  const alivePlayers = state.players.filter((p) => p.alive).length;
+
+  async function submitBid(bid: {
+    count: number;
+    face: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+    isZhai: boolean;
+  }) {
+    setBusy(true);
+    try {
+      await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'bid',
+          code,
+          count: bid.count,
+          face: bid.face,
+          isZhai: bid.isZhai,
+          expectedVersion: state.version,
+        }),
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitChallenge() {
+    setBusy(true);
+    try {
+      await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'challenge',
+          code,
+          expectedVersion: state.version,
+        }),
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <section className="flex-1 flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs uppercase tracking-wide" style={{ color: tokens.colors.textMuted }}>
-          {t(
-            `game.${
-              state.phase === 'rolling'
-                ? 'rollingPhase'
-                : state.phase === 'bidding'
-                  ? 'biddingPhase'
-                  : 'revealPhase'
-            }`,
-          )}
-        </p>
-        <p className="text-sm" style={{ color: tokens.colors.text }}>
-          {t('game.round', { n: state.round })}
-        </p>
-      </div>
+      <PlayerRing state={state} myPlayerId={myPlayerId} />
 
-      {/* 3D dice scene */}
+      {state.phase === 'bidding' && <BidChain state={state} />}
+
       <div
-        className="aspect-square rounded-2xl overflow-hidden"
+        className="aspect-square rounded-2xl overflow-hidden flex-shrink-0"
         style={{ backgroundColor: tokens.colors.surface }}
       >
         <DiceScene diceCount={diceCount} phase={dicePhase} />
       </div>
 
-      {/* Peek hand */}
-      {hand && (
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            onMouseDown={() => setPeeking(true)}
-            onMouseUp={() => setPeeking(false)}
-            onTouchStart={() => setPeeking(true)}
-            onTouchEnd={() => setPeeking(false)}
-            className="py-3 rounded-xl text-sm font-medium select-none"
-            style={{
-              backgroundColor: tokens.colors.surface,
-              color: tokens.colors.primary,
-              border: `1px solid ${tokens.colors.primary}55`,
-            }}
-          >
-            {peeking ? '🎲 ' + hand.join(' · ') : t('game.peekHand')}
-          </button>
-        </div>
+      {hand && state.phase !== 'reveal' && (
+        <button
+          type="button"
+          onMouseDown={() => setPeeking(true)}
+          onMouseUp={() => setPeeking(false)}
+          onMouseLeave={() => setPeeking(false)}
+          onTouchStart={() => setPeeking(true)}
+          onTouchEnd={() => setPeeking(false)}
+          className="py-3 rounded-xl text-sm font-medium select-none"
+          style={{
+            backgroundColor: tokens.colors.surface,
+            color: tokens.colors.primary,
+            border: `1px solid ${tokens.colors.primary}55`,
+          }}
+        >
+          {peeking
+            ? '🎲 ' + hand.map((f) => ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][f - 1] || f).join(' · ')
+            : t('game.peekHand')}
+        </button>
       )}
 
-      <p className="text-xs text-center" style={{ color: tokens.colors.textMuted }}>
-        you: {myPlayerId?.slice(0, 8) ?? '—'}
-      </p>
+      {state.phase === 'bidding' && isMyTurn && (
+        <BidPanel
+          state={state}
+          alivePlayers={alivePlayers}
+          onBid={submitBid}
+          onChallenge={submitChallenge}
+          busy={busy}
+        />
+      )}
+
+      {state.phase === 'bidding' && !isMyTurn && (
+        <p className="text-center text-sm" style={{ color: tokens.colors.textMuted }}>
+          {t('game.playerTurn', { name: state.players[state.currentTurnIdx]?.nick ?? '?' })}
+        </p>
+      )}
+
+      {state.phase === 'reveal' && <RevealStage state={state} hands={allHands} />}
     </section>
   );
 }
