@@ -34,6 +34,8 @@ export const metadata: Metadata = {
   title: '大话骰',
   description: '2-8 player Liar\'s Dice with 3D physics, gyroscope shake-to-roll, and 4 switchable themes',
   applicationName: '大话骰',
+  manifest: '/manifest.json',
+  icons: { icon: '/icon.svg', apple: '/icon.svg' },
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: '大话骰' },
 };
 
