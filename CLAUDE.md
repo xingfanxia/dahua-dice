@@ -13,11 +13,12 @@
 ## Critical rules
 
 1. **Never `vercel link --yes` without explicit scope.** Always pass `--scope panpanmao`. The CLI default is hostile (picks `computelabs`). See `~/.claude/projects/-Users-xingfanxia-projects/memory/feedback_vercel_team_scope.md` for the durable rule.
-2. **Next.js 16 calls it `proxy`, not `middleware`.** File is `proxy.ts` at repo root, export name MUST be `function proxy(req: NextRequest)`. If you write `middleware`, build fails.
-3. **Lua scripts are JS template strings** in `lib/lua/scripts.ts`, NOT `.lua` files. (Avoids `process.cwd()` resolution at build time.) Camel-case export names: `joinRoom`, `startGame`, `placeBid`, `challenge`. The wrapper `runScript` in `lib/lua/run.ts` calls `redis.eval` via SDK.
-4. **Dice rolls must be server-side** (`lib/room/dice-rng.ts` uses `crypto.randomInt`). Client UI is decorative — Rapier physics lands on random faces visually, but the authoritative hand is what the server stores in `room:{code}:hands`.
-5. **Theme tokens live in `components/theme/tokens.ts`**. ThemeProvider sets CSS vars + `data-theme` attr on root. NO hardcoded colors in components; use the tokens.
-6. **Anti-AI-slop applies** (from `~/.claude/CLAUDE.md` design rules): no Inter / Lucide / `100vh` / `#000` / centered hero grids. Use the 4 themes' specific fonts (Space Grotesk / Newsreader / Noto Serif TC / Plus Jakarta), `oklch()` colors, `min-h-[100dvh]`, Phosphor / Heroicons / Radix icons.
+2. **`vercel.json` MUST set `framework: "nextjs"` explicitly.** Without it, Vercel auto-detection silently picks `@vercel/static-build` for Next 16, producing builds with **zero server functions**. Symptom: every app route 404s (incl. `/`, `/api/*`), but `/public/` static assets serve fine. The deploy still shows "Ready" — the bug is invisible until you actually hit the URL. See [[feedback_vercel_nextjs_framework_detection]].
+3. **Next.js 16 calls it `proxy`, not `middleware`.** File is `proxy.ts` at repo root, export name MUST be `function proxy(req: NextRequest)`. If you write `middleware`, build fails.
+4. **Lua scripts are JS template strings** in `lib/lua/scripts.ts`, NOT `.lua` files. (Avoids `process.cwd()` resolution at build time.) Camel-case export names: `joinRoom`, `startGame`, `placeBid`, `challenge`. The wrapper `runScript` in `lib/lua/run.ts` calls `redis.eval` via SDK.
+5. **Dice rolls must be server-side** (`lib/room/dice-rng.ts` uses `crypto.randomInt`). Client UI is decorative — Rapier physics lands on random faces visually, but the authoritative hand is what the server stores in `room:{code}:hands`.
+6. **Theme tokens live in `components/theme/tokens.ts`**. ThemeProvider sets CSS vars + `data-theme` attr on root. NO hardcoded colors in components; use the tokens.
+7. **Anti-AI-slop applies** (from `~/.claude/CLAUDE.md` design rules): no Inter / Lucide / `100vh` / `#000` / centered hero grids. Use the 4 themes' specific fonts (Space Grotesk / Newsreader / Noto Serif TC / Plus Jakarta), `oklch()` colors, `min-h-[100dvh]`, Phosphor / Heroicons / Radix icons.
 
 ## Tech stack quick ref
 
