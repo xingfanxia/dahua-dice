@@ -11,14 +11,28 @@ import { unlockAudio } from '@/lib/audio/howl-instance';
 const CODE_ALPHABET = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]*$/;
 const CODE_LEN = 6;
 
-export function HomeClient({ initialError }: { initialError: string | null }) {
+export function HomeClient({
+  initialError,
+  initialJoinCode,
+}: {
+  initialError: string | null;
+  initialJoinCode: string | null;
+}) {
   const router = useRouter();
   const t = useTranslations();
   const { theme, setTheme, tokens } = useTheme();
+  const nickInputRef = useRef<HTMLInputElement>(null);
+
+  const validInitialCode =
+    initialJoinCode &&
+    initialJoinCode.length === CODE_LEN &&
+    CODE_ALPHABET.test(initialJoinCode)
+      ? initialJoinCode
+      : '';
 
   const [nick, setNick] = useState('');
-  const [mode, setMode] = useState<'idle' | 'join'>('idle');
-  const [joinCode, setJoinCode] = useState('');
+  const [mode, setMode] = useState<'idle' | 'join'>(validInitialCode ? 'join' : 'idle');
+  const [joinCode, setJoinCode] = useState(validInitialCode);
   const [busy, setBusy] = useState<'create' | 'join' | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const codeInputRef = useRef<HTMLInputElement>(null);
@@ -27,11 +41,17 @@ export function HomeClient({ initialError }: { initialError: string | null }) {
     if (initialError === 'room_not_found') setErr(t('errors.roomNotFound'));
     // Arm Howler autoUnlock so audio works once user reaches the room
     unlockAudio();
-  }, [initialError, t]);
+    // If we arrived via an invite link (?join=CODE), focus the nickname input
+    // — the code is already filled, just need their name.
+    if (validInitialCode) {
+      nickInputRef.current?.focus();
+    }
+  }, [initialError, t, validInitialCode]);
 
   useEffect(() => {
-    if (mode === 'join') codeInputRef.current?.focus();
-  }, [mode]);
+    // Only auto-focus code input when user clicked 加入房间 (no pre-fill).
+    if (mode === 'join' && !validInitialCode) codeInputRef.current?.focus();
+  }, [mode, validInitialCode]);
 
   function validateNickname(): string | null {
     const n = nick.trim();
@@ -138,6 +158,21 @@ export function HomeClient({ initialError }: { initialError: string | null }) {
           </p>
         </header>
 
+        {/* invite banner — only when arrived via /?join=CODE */}
+        {validInitialCode && (
+          <div
+            className="mt-8 max-w-md rounded-2xl border px-4 py-3 font-ui text-sm"
+            style={{
+              borderColor: `color-mix(in oklch, ${tokens.colors.primary} 40%, transparent)`,
+              backgroundColor: `color-mix(in oklch, ${tokens.colors.primary} 12%, transparent)`,
+              color: tokens.colors.text,
+            }}
+          >
+            {t('lobby.invitedToJoin')}{' '}
+            <span className="font-display tracking-[0.18em] tabular-nums">{validInitialCode}</span>
+          </div>
+        )}
+
         {/* form card */}
         <section className="mt-12 max-w-md sm:mt-16">
           <label className="block">
@@ -145,6 +180,7 @@ export function HomeClient({ initialError }: { initialError: string | null }) {
               {t('home.nicknamePlaceholder')}
             </span>
             <input
+              ref={nickInputRef}
               type="text"
               value={nick}
               onChange={(e) => {

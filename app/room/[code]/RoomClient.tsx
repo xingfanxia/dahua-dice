@@ -66,8 +66,19 @@ export function RoomClient({
   }, [refetch]);
 
   async function handleCopy() {
+    const url = `${window.location.origin}/room/${code}`;
+    const shareText = t('lobby.shareText', { code });
+    // Prefer native share sheet on mobile (iOS/Android). Fall back to clipboard.
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title: t('common.appName'), text: shareText, url });
+        return;
+      } catch {
+        // user canceled OR API rejected — fall through to clipboard
+      }
+    }
     try {
-      await navigator.clipboard.writeText(code);
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {}

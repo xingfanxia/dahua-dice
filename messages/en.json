@@ -26,8 +26,10 @@
   },
   "lobby": {
     "title": "Room {code}",
-    "copyCode": "Copy invite code",
+    "copyCode": "Copy invite link",
     "copied": "Copied",
+    "shareText": "Come play Liar's Dice with me — room {code}",
+    "invitedToJoin": "You've been invited to join room",
     "playersCount": "Players ({count}/{max})",
     "waiting": "Waiting for players",
     "youHost": "(you, host)",

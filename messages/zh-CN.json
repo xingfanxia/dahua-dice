@@ -26,8 +26,10 @@
   },
   "lobby": {
     "title": "房间 {code}",
-    "copyCode": "复制邀请码",
+    "copyCode": "复制邀请链接",
     "copied": "已复制",
+    "shareText": "我邀请你来玩大话骰：房间 {code}",
+    "invitedToJoin": "已邀请你加入房间",
     "playersCount": "玩家 ({count}/{max})",
     "waiting": "等待玩家加入",
     "youHost": "(你, 房主)",
