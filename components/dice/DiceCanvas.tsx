@@ -2,8 +2,9 @@
 
 import { Canvas } from '@react-three/fiber';
 import { Physics, RigidBody, type RapierRigidBody, CuboidCollider } from '@react-three/rapier';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '@/components/theme/ThemeProvider';
+import { oklchToHex } from '@/lib/theme/oklch-to-hex';
 import { detectTopFace, Dice } from './Dice';
 import { DiceCup } from './DiceCup';
 
@@ -25,6 +26,8 @@ export function DiceCanvas({
   const { tokens } = useTheme();
   const bodyRefs = useRef<Array<RapierRigidBody | null>>([]);
   const [settled, setSettled] = useState<Record<number, number>>({});
+  // Three.js can't parse oklch; convert via browser canvas roundtrip.
+  const bgHex = useMemo(() => oklchToHex(tokens.colors.bg, '#0a0a0a'), [tokens.colors.bg]);
 
   // Track when all dice are settled
   useEffect(() => {
@@ -73,7 +76,7 @@ export function DiceCanvas({
       camera={{ position: [0, 5, 4], fov: 35 }}
       style={{ touchAction: 'none' }}
     >
-      <color attach="background" args={[tokens.colors.bg]} />
+      <color attach="background" args={[bgHex]} />
       <ambientLight intensity={0.6} />
       <directionalLight position={[5, 8, 5]} intensity={0.7} />
       <Physics gravity={[0, -9.8, 0]} timeStep="vary">

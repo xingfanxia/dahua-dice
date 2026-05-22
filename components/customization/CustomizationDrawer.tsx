@@ -48,17 +48,24 @@ export function CustomizationDrawer({
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center"
-      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('customization.title')}
       onKeyDown={(e) => {
         if (e.key === 'Escape') onClose();
       }}
     >
+      {/* Backdrop — click outside panel dismisses; Esc handler on parent for keyboard. */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard handled at parent role=dialog */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: scrim, not interactive content */}
       <div
+        onClick={onClose}
         className="absolute inset-0 backdrop-blur-sm"
         style={{ backgroundColor: `color-mix(in oklch, ${tokens.colors.bg} 65%, transparent)` }}
       />
-      <button
-        type="button"
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopping propagation, not handling interaction */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: container for dialog content */}
+      <div
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-md max-h-[85dvh] overflow-y-auto rounded-t-3xl p-6 flex flex-col gap-6"
         style={{ backgroundColor: tokens.colors.bg, color: tokens.colors.text }}
@@ -157,7 +164,7 @@ export function CustomizationDrawer({
             {t('customization.onlyOwnerCanEdit')}
           </p>
         )}
-      </button>
+      </div>
     </div>
   );
 }

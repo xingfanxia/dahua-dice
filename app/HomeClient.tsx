@@ -300,6 +300,9 @@ function ThemeChip({
 // Map API reason codes to i18n error keys.
 function mapApiReason(reason: string | undefined): string {
   switch (reason) {
+    case 'no_room':
+    case 'room_not_found':
+      return 'roomNotFound';
     case 'room_full':
       return 'roomFull';
     case 'room_not_found':

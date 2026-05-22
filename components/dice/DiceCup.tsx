@@ -1,7 +1,9 @@
 'use client';
 
 import { CuboidCollider, RigidBody } from '@react-three/rapier';
+import { useMemo } from 'react';
 import { useTheme } from '@/components/theme/ThemeProvider';
+import { oklchToHex } from '@/lib/theme/oklch-to-hex';
 
 /**
  * The dice "cup" — a static cylindrical container for the dice. Until reveal phase,
@@ -18,6 +20,7 @@ export function DiceCup({
   yOffset?: number;
 }) {
   const { tokens } = useTheme();
+  const surfaceHex = useMemo(() => oklchToHex(tokens.colors.surface, '#222'), [tokens.colors.surface]);
   const radius = 1.6;
   const height = 2.5;
   const wallThickness = 0.1;
@@ -29,7 +32,7 @@ export function DiceCup({
         <mesh position={[0, height / 2, 0]}>
           <cylinderGeometry args={[radius, radius, height, 32, 1, true]} />
           <meshStandardMaterial
-            color={tokens.colors.surface}
+            color={surfaceHex}
             roughness={0.5}
             metalness={tokens.dice.cupMaterial === 'metal' ? 0.7 : 0.1}
             side={2}

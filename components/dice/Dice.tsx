@@ -1,9 +1,10 @@
 'use client';
 
 import { RigidBody, type RapierRigidBody } from '@react-three/rapier';
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { Quaternion, Vector3 } from 'three';
 import { useTheme } from '@/components/theme/ThemeProvider';
+import { oklchToHex } from '@/lib/theme/oklch-to-hex';
 
 const DICE_SIZE = 0.7;
 
@@ -47,6 +48,8 @@ export function Dice({
   forwardRef?: (ref: RapierRigidBody | null) => void;
 }) {
   const { tokens } = useTheme();
+  const faceHex = useMemo(() => oklchToHex(tokens.colors.diceFace, '#e8e8e8'), [tokens.colors.diceFace]);
+  const dotHex = useMemo(() => oklchToHex(tokens.colors.diceDot, '#1a1a1a'), [tokens.colors.diceDot]);
   const ref = useRef<RapierRigidBody>(null);
 
   return (
@@ -72,11 +75,11 @@ export function Dice({
     >
       <mesh>
         <boxGeometry args={[DICE_SIZE, DICE_SIZE, DICE_SIZE]} />
-        <meshStandardMaterial color={tokens.colors.diceFace} roughness={0.4} metalness={0.1} />
+        <meshStandardMaterial color={faceHex} roughness={0.4} metalness={0.1} />
       </mesh>
       {/* Pips: render as small spheres per face, positioned by face number */}
       {[1, 2, 3, 4, 5, 6].map((face) => (
-        <DicePips key={face} face={face} color={tokens.colors.diceDot} />
+        <DicePips key={face} face={face} color={dotHex} />
       ))}
     </RigidBody>
   );
