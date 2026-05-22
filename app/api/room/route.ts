@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { redis } from '@/lib/redis';
-import { createSession } from '@/lib/auth/session-store';
+import { createSession, updateSession } from '@/lib/auth/session-store';
 import { validateNickname } from '@/lib/auth/session';
 import { generateInviteCode } from '@/lib/room/invite-code';
 import { DEFAULT_RULES, type RoomState } from '@/lib/game-engine/types';
@@ -54,14 +54,17 @@ export async function POST(req: NextRequest) {
     createdAt: Date.now(),
   };
   await redis.set(`room:${code}:state`, state, { ex: LOBBY_TTL });
+  // Pin session to this room so reconnects + /api/whoami can route the user back
+  await updateSession(token, { currentRoom: code });
 
   const cookieStore = await cookies();
   cookieStore.set('dahua_token', token, {
     path: '/',
     maxAge: 86400,
     sameSite: 'lax',
-    httpOnly: false, // client also needs to read for SSE subscription auth (later)
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
   });
 
-  return NextResponse.json({ ok: true, code, token, playerId: session.playerId });
+  return NextResponse.json({ ok: true, code, playerId: session.playerId });
 }

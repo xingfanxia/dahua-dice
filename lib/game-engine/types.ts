@@ -43,6 +43,16 @@ export type Player = {
   alive: boolean;
 };
 
+export type ChallengeOutcome = {
+  actualCount: number;
+  bidderIdx: number;
+  loserIdx: number;
+  loserId: string;
+  actualMeetsBid: boolean;
+  gameEnded: boolean;
+  winnerIdx: number; // -1 if game not ended
+};
+
 export type RoomState = {
   code: string;
   phase: Phase;
@@ -56,4 +66,5 @@ export type RoomState = {
   theme: string;
   version: number;
   createdAt: number;
+  lastChallengeResult?: ChallengeOutcome | null;
 };

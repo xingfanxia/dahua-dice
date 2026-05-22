@@ -43,7 +43,7 @@ export const THEMES: Record<ThemeKey, ThemeTokens> = {
       diceFace: 'oklch(0.92 0.02 250)',
       diceDot: 'oklch(0.2 0.02 250)',
     },
-    fonts: { display: 'var(--font-space-grotesk)', ui: 'var(--font-inter)' },
+    fonts: { display: 'var(--font-space-grotesk)', ui: 'var(--font-outfit)' },
     dice: { textureSetUrl: '/dice-textures/modern/', material: 'glass', cupMaterial: 'metal' },
     audioPackPath: '/audio/modern.json',
     motion: { duration: '200ms', easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },

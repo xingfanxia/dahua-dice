@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { isValidInviteCode } from '@/lib/room/invite-code';
 import { UPSTASH_REST_TOKEN, UPSTASH_REST_URL } from '@/lib/redis';
+import { requireMembership } from '@/lib/auth/membership';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -9,7 +10,7 @@ export const maxDuration = 300;
 
 /**
  * Server-Sent Events endpoint that subscribes to `room:{code}:events` on
- * Upstash Redis and pipes messages to the browser EventSource.
+ * Upstash Redis and pipes messages to the browser EventSource. Members-only.
  *
  * Architecture (per docs/research/multiplayer-sync-research.md path B):
  *   client EventSource → /api/stream/[code]
@@ -17,12 +18,14 @@ export const maxDuration = 300;
  *                                                  (SSE stream)
  *                            ◀──── pipe ─────────┘
  */
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
   const { code: rawCode } = await params;
   const code = rawCode.toUpperCase();
   if (!isValidInviteCode(code)) {
     return new Response('invalid_code', { status: 400 });
   }
+  const m = await requireMembership(code);
+  if (!m.ok) return new Response(m.reason, { status: m.status });
 
   const channel = `room:${code}:events`;
   const upstreamResponse = await fetch(`${UPSTASH_REST_URL}/subscribe/${channel}`, {
@@ -31,8 +34,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ cod
       Authorization: `Bearer ${UPSTASH_REST_TOKEN}`,
       Accept: 'text/event-stream',
     },
-    // Disable Next.js caching for the upstream subscribe fetch
     cache: 'no-store',
+    // Cancel the upstream pipe when the browser disconnects, so we don't
+    // hold the Upstash subscribe open until maxDuration.
+    signal: req.signal,
   });
 
   if (!upstreamResponse.ok || !upstreamResponse.body) {

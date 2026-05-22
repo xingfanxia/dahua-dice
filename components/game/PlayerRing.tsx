@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import type { Player, RoomState } from '@/lib/game-engine/types';
 
@@ -10,6 +11,7 @@ export function PlayerRing({
   state: RoomState;
   myPlayerId: string | null;
 }) {
+  const t = useTranslations();
   const { tokens } = useTheme();
   const turnPlayer = state.players[state.currentTurnIdx];
   return (
@@ -35,7 +37,7 @@ export function PlayerRing({
               {p.nick}
               {isMe && (
                 <span className="ml-1 text-xs" style={{ color: tokens.colors.textMuted }}>
-                  (你)
+                  {t('lobby.you')}
                 </span>
               )}
             </span>

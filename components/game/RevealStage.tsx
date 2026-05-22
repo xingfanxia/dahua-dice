@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { useTheme } from '@/components/theme/ThemeProvider';
-import { resolveChallenge } from '@/lib/game-engine/resolve';
 import type { RoomState } from '@/lib/game-engine/types';
 
 const DICE_GLYPHS = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅', '7', '8'];
@@ -10,10 +10,13 @@ const DICE_GLYPHS = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅', '7', '8'];
 export function RevealStage({
   state,
   hands,
+  myPlayerId,
 }: {
   state: RoomState;
   hands: Record<string, number[]> | null;
+  myPlayerId: string | null;
 }) {
+  const t = useTranslations();
   const { tokens } = useTheme();
   const [showResult, setShowResult] = useState(false);
 
@@ -25,15 +28,15 @@ export function RevealStage({
   if (!hands || !state.lastBid) {
     return (
       <p className="text-center text-sm" style={{ color: tokens.colors.textMuted }}>
-        等待揭晓…
+        {t('game.waitingReveal')}
       </p>
     );
   }
 
-  const handsList = state.players.filter((p) => p.alive).map((p) => hands[p.id] ?? []);
-  const aliveBidderIdx = state.players.filter((p) => p.alive).findIndex((p) => p.id !== state.players[state.currentTurnIdx]?.id);
-  const result = resolveChallenge(state.lastBid, handsList, state.rules, state.currentTurnIdx, aliveBidderIdx);
-  const loser = state.players[result.loserIdx];
+  // Server-computed result lives on state.lastChallengeResult. If somehow absent
+  // (race during reveal-broadcast catchup), fall back to neutral "?" display.
+  const result = state.lastChallengeResult ?? null;
+  const loser = result ? state.players[result.loserIdx] : null;
 
   return (
     <section className="flex flex-col gap-4">
@@ -41,50 +44,77 @@ export function RevealStage({
         className="text-2xl font-display text-center"
         style={{ color: tokens.colors.primary }}
       >
-        揭晓!
+        {t('game.revealHeader')}
       </h2>
 
       <div className="flex flex-col gap-2">
         {state.players.map((p) => {
           const hand = hands[p.id] ?? [];
-          const isMe = false; // TODO when myPlayerId is wired
+          const isMe = p.id === myPlayerId;
           return (
             <div
               key={p.id}
               className="flex items-center justify-between p-2 rounded-xl"
-              style={{ backgroundColor: tokens.colors.surface }}
+              style={{
+                backgroundColor: tokens.colors.surface,
+                outline: isMe ? `1px solid ${tokens.colors.primary}80` : 'none',
+              }}
             >
-              <span style={{ color: tokens.colors.text }}>{p.nick}</span>
+              <span style={{ color: tokens.colors.text }}>
+                {p.nick}
+                {isMe && (
+                  <span style={{ color: tokens.colors.textMuted }}> {t('game.you')}</span>
+                )}
+                {!p.alive && (
+                  <span style={{ color: tokens.colors.danger }}> 💀</span>
+                )}
+              </span>
               <div className="flex gap-1 text-2xl">
-                {hand.map((face, i) => (
-                  <span
-                    /* biome-ignore lint/suspicious/noArrayIndexKey: positional dice */
-                    key={i}
-                    style={{
-                      color:
-                        face === state.lastBid?.face || (face === 1 && state.rules.aceWild && !state.lastBid?.isZhai)
-                          ? tokens.colors.accent
-                          : tokens.colors.text,
-                    }}
-                  >
-                    {DICE_GLYPHS[face - 1]}
-                  </span>
-                ))}
+                {hand.map((face, i) => {
+                  const counted =
+                    face === state.lastBid?.face ||
+                    (face === 1 && state.rules.aceWild && !state.lastBid?.isZhai);
+                  return (
+                    <span
+                      /* biome-ignore lint/suspicious/noArrayIndexKey: positional dice */
+                      key={i}
+                      style={{
+                        color: counted ? tokens.colors.accent : tokens.colors.text,
+                      }}
+                    >
+                      {DICE_GLYPHS[face - 1]}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           );
         })}
       </div>
 
-      {showResult && (
+      {showResult && result && (
         <div className="flex flex-col items-center gap-2 mt-2">
           <p style={{ color: tokens.colors.text }}>
-            叫: <span className="num">{state.lastBid.count}</span> 个 {DICE_GLYPHS[state.lastBid.face - 1]} ·
-            实际: <span className="num">{result.actualCount}</span>
+            {t('game.bidLabel')}{' '}
+            <span className="num">{state.lastBid.count}</span>
+            {' × '}
+            {DICE_GLYPHS[state.lastBid.face - 1]} ·{' '}
+            {t('game.actualLabel')}{' '}
+            <span className="num">{result.actualCount}</span>
           </p>
-          <p className="text-lg" style={{ color: tokens.colors.danger }}>
-            💀 {loser?.nick} 输一颗骰
-          </p>
+          {loser && (
+            <p className="text-lg" style={{ color: tokens.colors.danger }}>
+              {t('game.loserLostDie', { name: loser.nick })}
+            </p>
+          )}
+          {result.gameEnded && result.winnerIdx >= 0 && (
+            <p
+              className="mt-3 text-xl font-display"
+              style={{ color: tokens.colors.accent }}
+            >
+              {t('game.champion', { name: state.players[result.winnerIdx]?.nick ?? '?' })}
+            </p>
+          )}
         </div>
       )}
     </section>

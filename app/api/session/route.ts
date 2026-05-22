@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     const session = await readSession(existing);
     if (session) {
       const updated = await updateSession(existing, { nick: v.value, theme });
-      return NextResponse.json({ ok: true, token: existing, playerId: updated?.playerId });
+      return NextResponse.json({ ok: true, playerId: updated?.playerId });
     }
   }
   const { token, session } = await createSession({ nick: v.value, theme });
@@ -35,7 +35,8 @@ export async function POST(req: NextRequest) {
     path: '/',
     maxAge: 86400,
     sameSite: 'lax',
-    httpOnly: false,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
   });
-  return NextResponse.json({ ok: true, token, playerId: session.playerId });
+  return NextResponse.json({ ok: true, playerId: session.playerId });
 }

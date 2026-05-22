@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { useTheme } from '@/components/theme/ThemeProvider';
-import { isValidBid } from '@/lib/game-engine/validate';
+import { getStartingBidThreshold, isValidBid } from '@/lib/game-engine/validate';
 import type { Bid, Face, GameRules, RoomState } from '@/lib/game-engine/types';
 
 const DICE_GLYPHS = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅', '7', '8'];
@@ -48,7 +48,7 @@ export function BidPanel({
           })}
           {state.lastBid.isZhai && (
             <span className="ml-1" style={{ color: tokens.colors.accent }}>
-              · 斋
+              · {t('game.zhai')}
             </span>
           )}
         </p>
@@ -140,16 +140,35 @@ export function BidPanel({
             className="flex-1 py-4 rounded-2xl font-medium disabled:opacity-40 transition-opacity"
             style={{ backgroundColor: tokens.colors.danger, color: tokens.colors.bg }}
           >
-            🔓 {t('game.challenge')}
+            {t('game.challenge')}
           </button>
         )}
       </div>
 
       {!validation.ok && (
         <p className="text-xs text-center" style={{ color: tokens.colors.danger }}>
-          {validation.reason === 'not_higher'
-            ? t('errors.mustBeHigher')
-            : validation.reason}
+          {(() => {
+            switch (validation.reason) {
+              case 'zhai_disabled':
+                return t('errors.zhaiDisabled');
+              case 'invalid_count':
+                return t('errors.invalidCount');
+              case 'invalid_face':
+                return t('errors.invalidFace');
+              case 'below_starting':
+                return t('errors.belowStarting', {
+                  min: getStartingBidThreshold(alivePlayers, false, rules),
+                });
+              case 'break_zhai_needs_2x':
+                return t('errors.breakZhaiNeeds2x');
+              case 'enter_zhai_too_low':
+                return t('errors.enterZhaiTooLow', { min: 1 });
+              case 'not_higher':
+                return t('errors.mustBeHigher');
+              default:
+                return t('errors.invalidBid');
+            }
+          })()}
         </p>
       )}
     </section>

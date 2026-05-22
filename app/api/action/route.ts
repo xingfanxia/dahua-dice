@@ -7,18 +7,17 @@ import { runScript } from '@/lib/lua/run';
 import { redis } from '@/lib/redis';
 import { isValidBid } from '@/lib/game-engine/validate';
 import { rollDice } from '@/lib/room/dice-rng';
-import type { Face, RoomState } from '@/lib/game-engine/types';
+import type { Face, GameRules, RoomState } from '@/lib/game-engine/types';
 
 export const runtime = 'nodejs';
-
-import type { GameRules } from '@/lib/game-engine/types';
 
 type Action =
   | { type: 'join'; code: string; nick: string; avatar?: string }
   | { type: 'start'; code: string }
-  | { type: 'roll'; code: string }
   | { type: 'bid'; code: string; count: number; face: Face; isZhai: boolean; expectedVersion: number }
   | { type: 'challenge'; code: string; expectedVersion: number }
+  | { type: 'nextRound'; code: string; expectedVersion: number }
+  | { type: 'leave'; code: string }
   | { type: 'updateRules'; code: string; rules: GameRules };
 
 export async function POST(req: NextRequest) {
@@ -34,12 +33,12 @@ export async function POST(req: NextRequest) {
   }
   const code = body.code.toUpperCase();
   const stateKey = `room:${code}:state`;
+  const handsKey = `room:${code}:hands`;
 
   switch (body.type) {
     case 'join': {
       const v = validateNickname(body.nick);
       if (!v.ok) return NextResponse.json({ ok: false, reason: v.reason }, { status: 400 });
-      // Update session nick + currentRoom (best-effort)
       await updateSession(token, { nick: v.value, currentRoom: code });
       const result = await runScript('joinRoom', [stateKey], [
         session.playerId,
@@ -49,31 +48,28 @@ export async function POST(req: NextRequest) {
       const status = !result.ok && result.reason === 'room_full' ? 403 : 200;
       return NextResponse.json(result, { status: result.ok ? 200 : status });
     }
+
     case 'start': {
-      const result = await runScript('startGame', [stateKey], [session.playerId]);
-      if (result.ok) {
-        // Roll dice for each alive player; store encrypted hands separately
-        const state = await redis.get<RoomState>(stateKey);
-        if (state) {
-          const handsKey = `room:${code}:hands`;
-          await redis.del(handsKey);
-          const handsMap: Record<string, number[]> = {};
-          for (const p of state.players) {
-            if (p.alive) handsMap[p.id] = rollDice(p.diceLeft, state.rules.diceSides);
-          }
-          await redis.hset(handsKey, handsMap as Record<string, unknown>);
-          await redis.expire(handsKey, 21600);
-          // Advance phase from rolling → bidding
-          const updated = { ...state, phase: 'bidding' as const, version: state.version + 1 };
-          await redis.set(stateKey, updated, { ex: 21600 });
-        }
+      // Generate hands in Node (crypto.randomInt) then atomically commit via Lua
+      // so phase advance + hands hash are written in a single CAS.
+      const state = await redis.get<RoomState>(stateKey);
+      if (!state) return NextResponse.json({ ok: false, reason: 'no_room' }, { status: 404 });
+      if (state.phase !== 'lobby') {
+        return NextResponse.json({ ok: false, reason: 'wrong_phase' }, { status: 400 });
       }
+      const handArgs: string[] = [];
+      for (const p of state.players) {
+        if (!p.alive) continue;
+        handArgs.push(p.id, JSON.stringify(rollDice(p.diceLeft, state.rules.diceSides)));
+      }
+      const result = await runScript(
+        'startGame',
+        [stateKey, handsKey],
+        [session.playerId, ...handArgs],
+      );
       return NextResponse.json(result);
     }
-    case 'roll': {
-      // Each player can request a fresh roll only when phase=rolling; rare
-      return NextResponse.json({ ok: false, reason: 'rolling_auto_on_start' });
-    }
+
     case 'bid': {
       const state = await redis.get<RoomState>(stateKey);
       if (!state) return NextResponse.json({ ok: false, reason: 'no_room' }, { status: 404 });
@@ -96,10 +92,40 @@ export async function POST(req: NextRequest) {
       ]);
       return NextResponse.json(result);
     }
+
     case 'challenge': {
-      const result = await runScript('challenge', [stateKey], [session.playerId, String(body.expectedVersion)]);
+      const result = await runScript(
+        'resolveChallenge',
+        [stateKey, handsKey],
+        [session.playerId, String(body.expectedVersion)],
+      );
       return NextResponse.json(result);
     }
+
+    case 'nextRound': {
+      const state = await redis.get<RoomState>(stateKey);
+      if (!state) return NextResponse.json({ ok: false, reason: 'no_room' }, { status: 404 });
+      // Generate fresh hands for all alive players
+      const handArgs: string[] = [];
+      for (const p of state.players) {
+        if (!p.alive) continue;
+        handArgs.push(p.id, JSON.stringify(rollDice(p.diceLeft, state.rules.diceSides)));
+      }
+      const result = await runScript(
+        'nextRound',
+        [stateKey, handsKey],
+        [session.playerId, String(body.expectedVersion), ...handArgs],
+      );
+      return NextResponse.json(result);
+    }
+
+    case 'leave': {
+      const result = await runScript('leaveRoom', [stateKey], [session.playerId]);
+      // Clear currentRoom on session even if removal failed (best-effort)
+      await updateSession(token, { currentRoom: null });
+      return NextResponse.json(result);
+    }
+
     case 'updateRules': {
       const state = await redis.get<RoomState>(stateKey);
       if (!state) return NextResponse.json({ ok: false, reason: 'no_room' }, { status: 404 });
@@ -115,7 +141,7 @@ export async function POST(req: NextRequest) {
         players: state.players.map((p) => ({ ...p, diceLeft: body.rules.diceCount })),
         version: state.version + 1,
       };
-      await redis.set(stateKey, updated, { ex: 21600 });
+      await redis.set(stateKey, updated, { ex: 1800 });
       const payload = JSON.stringify({
         type: 'rules_updated',
         payload: { rules: body.rules },
@@ -125,6 +151,7 @@ export async function POST(req: NextRequest) {
       await redis.publish(`room:${code}:events`, payload);
       return NextResponse.json({ ok: true, version: updated.version });
     }
+
     default:
       return NextResponse.json({ ok: false, reason: 'unknown_action' }, { status: 400 });
   }

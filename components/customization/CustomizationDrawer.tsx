@@ -3,10 +3,8 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useTheme } from '@/components/theme/ThemeProvider';
-import { THEME_KEYS, THEMES, type ThemeKey } from '@/components/theme/tokens';
+import { THEME_KEYS, type ThemeKey } from '@/components/theme/tokens';
 import { DEFAULT_RULES, type GameRules } from '@/lib/game-engine/types';
-
-const TEXTURE_SETS = ['numeric', 'emoji', 'hanzi', 'panda'] as const;
 
 export function CustomizationDrawer({
   open,
@@ -25,7 +23,7 @@ export function CustomizationDrawer({
   currentTheme: ThemeKey;
   onSwitchTheme: (key: ThemeKey) => void;
 }) {
-  const t = useTranslations('customization');
+  const t = useTranslations();
   const { tokens } = useTheme();
   const [diceCount, setDiceCount] = useState<3 | 4 | 5 | 6 | 7>(rules.diceCount);
   const [aceWild, setAceWild] = useState(rules.aceWild);
@@ -55,7 +53,10 @@ export function CustomizationDrawer({
         if (e.key === 'Escape') onClose();
       }}
     >
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div
+        className="absolute inset-0 backdrop-blur-sm"
+        style={{ backgroundColor: `color-mix(in oklch, ${tokens.colors.bg} 65%, transparent)` }}
+      />
       <button
         type="button"
         onClick={(e) => e.stopPropagation()}
@@ -63,12 +64,12 @@ export function CustomizationDrawer({
         style={{ backgroundColor: tokens.colors.bg, color: tokens.colors.text }}
       >
         <div className="w-12 h-1 rounded-full mx-auto" style={{ backgroundColor: tokens.colors.textMuted }} />
-        <h2 className="text-2xl font-display">{t('title')}</h2>
+        <h2 className="text-2xl font-display">{t('customization.title')}</h2>
 
         {/* Theme switcher (always available) */}
         <section className="flex flex-col gap-2">
           <h3 className="text-xs uppercase tracking-wide" style={{ color: tokens.colors.textMuted }}>
-            主题
+            {t('customization.themeSection')}
           </h3>
           <div className="grid grid-cols-2 gap-2">
             {THEME_KEYS.map((key) => (
@@ -82,7 +83,7 @@ export function CustomizationDrawer({
                   color: currentTheme === key ? tokens.colors.bg : tokens.colors.text,
                 }}
               >
-                {THEMES[key].label['zh-CN']}
+                {t(`themes.${key}`)}
               </button>
             ))}
           </div>
@@ -92,13 +93,14 @@ export function CustomizationDrawer({
         {isOwner && (
           <>
             <section className="flex items-center justify-between">
-              <span>{t('diceCount')}</span>
+              <span>{t('customization.diceCount')}</span>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setDiceCount((c) => Math.max(3, c - 1) as 3 | 4 | 5 | 6 | 7)}
                   className="w-9 h-9 rounded-full"
                   style={{ backgroundColor: tokens.colors.surface }}
+                  aria-label="−"
                 >
                   −
                 </button>
@@ -108,6 +110,7 @@ export function CustomizationDrawer({
                   onClick={() => setDiceCount((c) => Math.min(7, c + 1) as 3 | 4 | 5 | 6 | 7)}
                   className="w-9 h-9 rounded-full"
                   style={{ backgroundColor: tokens.colors.surface }}
+                  aria-label="+"
                 >
                   +
                 </button>
@@ -116,26 +119,26 @@ export function CustomizationDrawer({
 
             <section className="flex flex-col gap-3">
               <h3 className="text-xs uppercase tracking-wide" style={{ color: tokens.colors.textMuted }}>
-                {t('rules')}
+                {t('customization.rules')}
               </h3>
-              <Toggle label={t('aceWild')} value={aceWild} onChange={setAceWild} />
-              <Toggle label={t('allowZhai')} value={allowZhai} onChange={setAllowZhai} />
+              <Toggle label={t('customization.aceWild')} value={aceWild} onChange={setAceWild} />
+              <Toggle label={t('customization.allowZhai')} value={allowZhai} onChange={setAllowZhai} />
               <Toggle
-                label="劈 (Pi)"
+                label={t('customization.pi')}
                 value={chineseExt.pi}
                 onChange={(v) => setChineseExt({ ...chineseExt, pi: v })}
               />
               <Toggle
-                label="反劈 (Fanpi)"
+                label={t('customization.fanpi')}
                 value={chineseExt.fanpi}
                 onChange={(v) => setChineseExt({ ...chineseExt, fanpi: v })}
               />
               <Toggle
-                label="通杀 (Tongsha)"
+                label={t('customization.tongsha')}
                 value={chineseExt.tongsha}
                 onChange={(v) => setChineseExt({ ...chineseExt, tongsha: v })}
               />
-              <Toggle label={t('palifico')} value={palifico} onChange={setPalifico} />
+              <Toggle label={t('customization.palifico')} value={palifico} onChange={setPalifico} />
             </section>
 
             <button
@@ -144,14 +147,14 @@ export function CustomizationDrawer({
               className="py-4 rounded-2xl font-medium"
               style={{ backgroundColor: tokens.colors.primary, color: tokens.colors.bg }}
             >
-              保存
+              {t('customization.save')}
             </button>
           </>
         )}
 
         {!isOwner && (
           <p className="text-sm text-center" style={{ color: tokens.colors.textMuted }}>
-            只有房主可以修改规则
+            {t('customization.onlyOwnerCanEdit')}
           </p>
         )}
       </button>
@@ -183,8 +186,11 @@ function Toggle({
         }}
       >
         <span
-          className="absolute top-1 w-5 h-5 rounded-full bg-white transition-[left]"
-          style={{ left: value ? 'calc(100% - 1.25rem - 0.25rem)' : '0.25rem' }}
+          className="absolute top-1 left-1 w-5 h-5 rounded-full transition-transform duration-200 ease-out"
+          style={{
+            backgroundColor: tokens.colors.bg,
+            transform: value ? 'translateX(calc(100% + 0.5rem))' : 'translateX(0)',
+          }}
         />
       </button>
     </label>

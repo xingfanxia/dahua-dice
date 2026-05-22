@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getMessages } from 'next-intl/server';
 import {
-  Inter,
   Noto_Serif_TC,
   Newsreader,
   Outfit,
@@ -10,7 +11,6 @@ import {
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
 const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
   variable: '--font-space-grotesk',
@@ -47,7 +47,6 @@ export const viewport: Viewport = {
 };
 
 const fontClassNames = [
-  inter.variable,
   spaceGrotesk.variable,
   newsreader.variable,
   outfit.variable,
@@ -55,11 +54,15 @@ const fontClassNames = [
   plusJakarta.variable,
 ].join(' ');
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale();
+  const messages = await getMessages();
   return (
-    <html lang="zh-CN" className={fontClassNames} suppressHydrationWarning>
+    <html lang={locale} className={fontClassNames} suppressHydrationWarning>
       <body className="min-h-[100dvh] antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <ThemeProvider>{children}</ThemeProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

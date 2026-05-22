@@ -1,13 +1,12 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { redis } from '@/lib/redis';
 import { isValidInviteCode } from '@/lib/room/invite-code';
-import type { RoomState } from '@/lib/game-engine/types';
+import { requireMembership } from '@/lib/auth/membership';
 
 export const runtime = 'nodejs';
 
 /**
- * Return all players' hands. Only valid during phase=reveal.
- * Pre-reveal calls return 403.
+ * Return all players' hands. Members-only, and only during phase=reveal.
  */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
   const { code: rawCode } = await params;
@@ -15,9 +14,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ cod
   if (!isValidInviteCode(code)) {
     return NextResponse.json({ ok: false, reason: 'invalid_code' }, { status: 400 });
   }
-  const state = await redis.get<RoomState>(`room:${code}:state`);
-  if (!state) return NextResponse.json({ ok: false, reason: 'no_room' }, { status: 404 });
-  if (state.phase !== 'reveal') {
+  const m = await requireMembership(code);
+  if (!m.ok) return NextResponse.json({ ok: false, reason: m.reason }, { status: m.status });
+  if (m.state.phase !== 'reveal') {
     return NextResponse.json({ ok: false, reason: 'not_reveal_phase' }, { status: 403 });
   }
   const hands = await redis.hgetall<Record<string, number[]>>(`room:${code}:hands`);

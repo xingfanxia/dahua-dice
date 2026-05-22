@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useTheme } from '@/components/theme/ThemeProvider';
@@ -11,6 +11,9 @@ import { PlayerRing } from '@/components/game/PlayerRing';
 import { BidChain } from '@/components/game/BidChain';
 import { RevealStage } from '@/components/game/RevealStage';
 import { CustomizationDrawer } from '@/components/customization/CustomizationDrawer';
+import { useShakeDetector } from '@/components/shake/useShakeDetector';
+import { useDiceAudio } from '@/lib/audio/useDiceAudio';
+import { unlockAudio } from '@/lib/audio/howl-instance';
 import type { GameRules, RoomState } from '@/lib/game-engine/types';
 
 export function RoomClient({
@@ -28,19 +31,17 @@ export function RoomClient({
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // Identify ourselves from cookie via /api/session (read-only — won't create)
+  // Identify ourselves from cookie via /api/whoami
   useEffect(() => {
-    fetch(`/api/hand/${code}`, { method: 'GET' })
-      .then((r) => r.json())
-      .catch(() => null);
-    // Quick way to know my playerId: read the cookie via a tiny GET endpoint
     fetch('/api/whoami')
       .then((r) => r.json())
       .then((d) => {
         if (d.ok) setMyPlayerId(d.playerId);
       })
       .catch(() => null);
-  }, [code]);
+    // Arm Howler's autoUnlock for iOS Safari (needs to bind to user gesture)
+    unlockAudio();
+  }, []);
 
   // SSE-driven sync: on any room event, refetch the full state
   const refetch = useCallback(async () => {
@@ -86,7 +87,15 @@ export function RoomClient({
   }
 
   async function handleLeave() {
-    router.push('/');
+    try {
+      await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'leave', code }),
+      });
+    } finally {
+      router.push('/');
+    }
   }
 
   const isOwner = state.ownerId === myPlayerId;
@@ -234,8 +243,15 @@ function LobbyView({
           {t('lobby.rulesHeader')}
         </p>
         <p className="text-sm" style={{ color: tokens.colors.text }}>
-          每人 {state.rules.diceCount} 颗 · {state.rules.aceWild ? '1点万能' : '1点不算'} ·{' '}
-          {state.rules.allowZhai ? '允许斋' : '禁斋'}
+          {t('lobby.rulesSummary', {
+            count: state.rules.diceCount,
+            aceWild: state.rules.aceWild
+              ? t('lobby.rulesSummaryAceWild')
+              : t('lobby.rulesSummaryAceStrict'),
+            allowZhai: state.rules.allowZhai
+              ? t('lobby.rulesSummaryZhaiOn')
+              : t('lobby.rulesSummaryZhaiOff'),
+          })}
         </p>
       </section>
 
@@ -284,6 +300,30 @@ function GameView({
   const [allHands, setAllHands] = useState<Record<string, number[]> | null>(null);
   const [peeking, setPeeking] = useState(false);
   const [busy, setBusy] = useState(false);
+  const audio = useDiceAudio();
+  const phaseRef = useRef(state.phase);
+  phaseRef.current = state.phase;
+
+  // Audio coupling — fire stingers on phase transitions
+  useEffect(() => {
+    if (state.phase === 'reveal') audio.reveal();
+    if (state.phase === 'game_end') {
+      const r = state.lastChallengeResult;
+      if (r && r.winnerIdx >= 0 && state.players[r.winnerIdx]?.id === myPlayerId) audio.win();
+      else audio.lose();
+    }
+  }, [state.phase, state.lastChallengeResult, audio, myPlayerId, state.players]);
+
+  // Shake → audio coupling (vibration if available). Roll trigger isn't wired yet —
+  // server auto-rolls on start/nextRound, so this is feedback only.
+  useShakeDetector((intensity) => {
+    if (phaseRef.current === 'rolling' || phaseRef.current === 'bidding') {
+      audio.shake(intensity);
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate?.(Math.floor(intensity * 30));
+      }
+    }
+  });
 
   // Fetch my hand when game running
   useEffect(() => {
@@ -365,6 +405,23 @@ function GameView({
     }
   }
 
+  async function submitNextRound() {
+    setBusy(true);
+    try {
+      await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'nextRound',
+          code,
+          expectedVersion: state.version,
+        }),
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="flex-1 flex flex-col gap-4">
       <PlayerRing state={state} myPlayerId={myPlayerId} />
@@ -415,7 +472,36 @@ function GameView({
         </p>
       )}
 
-      {state.phase === 'reveal' && <RevealStage state={state} hands={allHands} />}
+      {state.phase === 'reveal' && (
+        <RevealStage state={state} hands={allHands} myPlayerId={myPlayerId} />
+      )}
+
+      {state.phase === 'reveal' && state.lastChallengeResult && !state.lastChallengeResult.gameEnded && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={submitNextRound}
+          className="py-3 rounded-2xl font-medium disabled:opacity-40"
+          style={{ backgroundColor: tokens.colors.primary, color: tokens.colors.bg }}
+        >
+          {t('game.nextRound')}
+        </button>
+      )}
+
+      {state.phase === 'game_end' && (
+        <div className="flex flex-col items-center gap-3 mt-4">
+          <p className="text-xl font-display" style={{ color: tokens.colors.accent }}>
+            {t('game.gameEnded')}
+          </p>
+          {state.lastChallengeResult && state.lastChallengeResult.winnerIdx >= 0 && (
+            <p style={{ color: tokens.colors.text }}>
+              {t('game.champion', {
+                name: state.players[state.lastChallengeResult.winnerIdx]?.nick ?? '?',
+              })}
+            </p>
+          )}
+        </div>
+      )}
     </section>
   );
 }

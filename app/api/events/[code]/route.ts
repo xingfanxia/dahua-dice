@@ -1,12 +1,13 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { redis } from '@/lib/redis';
 import { isValidInviteCode } from '@/lib/room/invite-code';
+import { requireMembership } from '@/lib/auth/membership';
 
 export const runtime = 'nodejs';
 
 /**
- * Replay recent events from the room's Redis Stream. Used by clients on
- * reconnect to recover any events missed during the disconnect window.
+ * Replay recent events from the room's Redis Stream. Members-only. Used by
+ * clients on reconnect to recover any events missed during the disconnect window.
  *
  * Query: ?since=<lastEventId>  (defaults to '0-0' = from beginning)
  */
@@ -16,6 +17,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
   if (!isValidInviteCode(code)) {
     return NextResponse.json({ ok: false, reason: 'invalid_code' }, { status: 400 });
   }
+  const m = await requireMembership(code);
+  if (!m.ok) return NextResponse.json({ ok: false, reason: m.reason }, { status: m.status });
   const since = req.nextUrl.searchParams.get('since') ?? '0-0';
   const streamKey = `room:${code}:events`;
   // XRANGE returns entries from `since` (exclusive of given id when prefixed with '(')

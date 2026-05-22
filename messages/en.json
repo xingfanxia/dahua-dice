@@ -8,7 +8,9 @@
     "loading": "Loading",
     "retry": "Retry",
     "settings": "Settings",
-    "close": "Close"
+    "close": "Close",
+    "theme": "Theme",
+    "language": "Language"
   },
   "home": {
     "title": "Liar's Dice",
@@ -31,6 +33,11 @@
     "youHost": "(you, host)",
     "you": "(you)",
     "rulesHeader": "Rules",
+    "rulesSummary": "{count} dice each · {aceWild} · {allowZhai}",
+    "rulesSummaryAceWild": "1s wild",
+    "rulesSummaryAceStrict": "1s strict",
+    "rulesSummaryZhaiOn": "zhai allowed",
+    "rulesSummaryZhaiOff": "no zhai",
     "modifyRules": "Modify rules",
     "startGame": "Start game",
     "needMorePlayers": "Need at least 2 players",
@@ -48,8 +55,10 @@
     "peekHand": "Peek at my dice",
     "bid": "Bid",
     "challenge": "Challenge",
+    "challengeAction": "Challenge",
     "count": "Count",
     "face": "Face",
+    "zhai": "zhai",
     "zhaiCall": "Zhai call (1s not wild)",
     "submitBid": "Bid {count} × {face}",
     "callDescription": "Previous: {count} × {face}",
@@ -59,7 +68,17 @@
     "winner": "{name} wins!",
     "nextRound": "Next round",
     "rematch": "Rematch",
-    "disband": "Disband room"
+    "disband": "Disband room",
+    "waitingFirstBid": "Waiting for first bid…",
+    "latestBid": "Latest bid",
+    "waitingReveal": "Waiting for reveal…",
+    "revealHeader": "Reveal!",
+    "bidLabel": "Bid:",
+    "actualLabel": "Actual:",
+    "loserLostDie": "💀 {name} lost a die",
+    "you": "(you)",
+    "gameEnded": "Game over",
+    "champion": "🏆 {name}"
   },
   "errors": {
     "network": "Network error",
@@ -71,10 +90,19 @@
     "sessionExpired": "Session expired",
     "empty": "Please enter a nickname",
     "tooLong": "Nickname up to 20 chars",
-    "invalidChars": "Nickname contains invalid characters"
+    "invalidChars": "Nickname contains invalid characters",
+    "zhaiDisabled": "Zhai disabled at this table",
+    "invalidFace": "Invalid face",
+    "enterZhaiTooLow": "Entering zhai needs at least {min}",
+    "breakZhaiNeeds2x": "Breaking zhai needs ≥ 2×",
+    "belowStarting": "First bid needs ≥ {min}",
+    "invalidCount": "Count must be a positive integer",
+    "notYourTurn": "Not your turn",
+    "stale": "State changed, syncing"
   },
   "customization": {
     "title": "Rules",
+    "themeSection": "Theme",
     "diceCount": "Dice per player",
     "diceCountHelper": "How many dice each",
     "appearance": "Appearance",
@@ -82,11 +110,16 @@
     "aceWild": "1s are wild",
     "allowZhai": "Allow zhai (close-call)",
     "chineseExtensions": "Chinese extensions (Pi / Fanpi / Tongsha)",
+    "pi": "Pi (split)",
+    "fanpi": "Fanpi (counter-split)",
+    "tongsha": "Tongsha (sweep)",
     "palifico": "Palifico (Perudo variant)",
     "diceSides": "Dice sides",
     "avatar": "Player avatars",
     "avatarHelper": "Each player picks their dice texture as ID",
-    "enterAvatarPicker": "Enter player picker"
+    "enterAvatarPicker": "Enter player picker",
+    "save": "Save",
+    "onlyOwnerCanEdit": "Only the host can edit rules"
   },
   "themes": {
     "modern-minimal": "Modern Minimal",

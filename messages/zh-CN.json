@@ -8,7 +8,9 @@
     "loading": "加载中",
     "retry": "重试",
     "settings": "设置",
-    "close": "关闭"
+    "close": "关闭",
+    "theme": "主题",
+    "language": "语言"
   },
   "home": {
     "title": "大话骰",
@@ -31,6 +33,11 @@
     "youHost": "(你, 房主)",
     "you": "(你)",
     "rulesHeader": "规则",
+    "rulesSummary": "每人 {count} 颗 · {aceWild} · {allowZhai}",
+    "rulesSummaryAceWild": "1点万能",
+    "rulesSummaryAceStrict": "1点不算",
+    "rulesSummaryZhaiOn": "允许斋",
+    "rulesSummaryZhaiOff": "禁斋",
     "modifyRules": "修改规则",
     "startGame": "开始游戏",
     "needMorePlayers": "至少 2 人才能开始",
@@ -48,8 +55,10 @@
     "peekHand": "查看我的骰子",
     "bid": "叫数",
     "challenge": "开",
+    "challengeAction": "开 (挑战)",
     "count": "数量",
     "face": "点数",
+    "zhai": "斋",
     "zhaiCall": "斋叫 (1 点不算)",
     "submitBid": "叫 {count} 个 {face}",
     "callDescription": "上家叫: {count} 个 {face}",
@@ -59,7 +68,17 @@
     "winner": "{name} 胜!",
     "nextRound": "下一局",
     "rematch": "再来一局",
-    "disband": "解散房间"
+    "disband": "解散房间",
+    "waitingFirstBid": "等待第一个叫数…",
+    "latestBid": "最新叫数",
+    "waitingReveal": "等待揭晓…",
+    "revealHeader": "揭晓!",
+    "bidLabel": "叫:",
+    "actualLabel": "实际:",
+    "loserLostDie": "💀 {name} 输一颗骰",
+    "you": "(你)",
+    "gameEnded": "游戏结束",
+    "champion": "🏆 {name}"
   },
   "errors": {
     "network": "网络错误",
@@ -71,10 +90,19 @@
     "sessionExpired": "会话已过期",
     "empty": "请输入昵称",
     "tooLong": "昵称最多 20 字",
-    "invalidChars": "昵称包含非法字符"
+    "invalidChars": "昵称包含非法字符",
+    "zhaiDisabled": "本桌禁斋",
+    "invalidFace": "无效点数",
+    "enterZhaiTooLow": "进入斋局至少 {min} 个",
+    "breakZhaiNeeds2x": "破斋需 2 倍以上",
+    "belowStarting": "首叫至少 {min} 个",
+    "invalidCount": "数量必须为正整数",
+    "notYourTurn": "现在不是你的回合",
+    "stale": "状态已变，正在同步"
   },
   "customization": {
     "title": "规则设定",
+    "themeSection": "主题",
     "diceCount": "骰子数",
     "diceCountHelper": "每人多少颗",
     "appearance": "外观",
@@ -82,11 +110,16 @@
     "aceWild": "1 点万能",
     "allowZhai": "允许斋",
     "chineseExtensions": "中式扩展 (劈/反劈/通杀)",
+    "pi": "劈 (Pi)",
+    "fanpi": "反劈 (Fanpi)",
+    "tongsha": "通杀 (Tongsha)",
     "palifico": "Palifico (海外变体)",
     "diceSides": "骰子面数",
     "avatar": "玩家头像化",
     "avatarHelper": "每个人选自己的骰子套装作 ID",
-    "enterAvatarPicker": "进入玩家自选"
+    "enterAvatarPicker": "进入玩家自选",
+    "save": "保存",
+    "onlyOwnerCanEdit": "只有房主可以修改规则"
   },
   "themes": {
     "modern-minimal": "现代极简",
