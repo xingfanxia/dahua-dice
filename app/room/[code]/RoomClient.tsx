@@ -51,7 +51,7 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
     } catch {}
   }, [code]);
 
-  useRoomEvents(code, () => {
+  const { status: connStatus } = useRoomEvents(code, () => {
     refetch();
   });
 
@@ -60,6 +60,19 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
     const interval = setInterval(refetch, 10000);
     return () => clearInterval(interval);
   }, [refetch]);
+
+  // Reconnect UX (spec §10A): SSE drop → banner; sustained >30s → full-screen rejoin.
+  const [reconnecting, setReconnecting] = useState(false);
+  const [longOffline, setLongOffline] = useState(false);
+  useEffect(() => {
+    if (connStatus === 'error') {
+      setReconnecting(true);
+      const timer = setTimeout(() => setLongOffline(true), 30000);
+      return () => clearTimeout(timer);
+    }
+    setReconnecting(false);
+    setLongOffline(false);
+  }, [connStatus]);
 
   async function handleCopy() {
     const url = `${window.location.origin}/room/${code}`;
@@ -110,12 +123,29 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { setTheme } = useTheme();
 
+  const [saveError, setSaveError] = useState<string | null>(null);
   async function handleSaveRules(rules: GameRules) {
-    await fetch('/api/action', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'updateRules', code, rules }),
-    });
+    const flash = (msg: string) => {
+      setSaveError(msg);
+      setTimeout(() => setSaveError(null), 3000);
+    };
+    try {
+      const r = await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'updateRules', code, rules }),
+      });
+      const j = await r.json();
+      if (!j.ok) {
+        flash(
+          j.reason === 'wrong_phase'
+            ? t('customization.midGameLocked')
+            : t('customization.saveFailed'),
+        );
+      }
+    } catch {
+      flash(t('customization.saveFailed'));
+    }
   }
 
   async function handleSetAvatar(avatar: string) {
@@ -143,8 +173,45 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
     }
   }
 
+  if (longOffline) {
+    return (
+      <main
+        className="min-h-[100dvh] safe-top safe-bottom flex flex-col items-center justify-center gap-4 px-6 text-center"
+        style={{ backgroundColor: tokens.colors.bg, color: tokens.colors.text }}
+      >
+        <p className="text-xl font-display">{t('game.disconnected')}</p>
+        <button
+          type="button"
+          onClick={() => router.refresh()}
+          className="px-6 min-h-[44px] rounded-2xl font-medium"
+          style={{ backgroundColor: tokens.colors.primary, color: tokens.colors.bg }}
+        >
+          {t('game.rejoin')}
+        </button>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-[100dvh] safe-top safe-bottom flex flex-col px-4 py-6 gap-6 max-w-md mx-auto w-full">
+      {reconnecting && (
+        <div
+          className="text-xs text-center py-1.5 rounded-lg"
+          role="status"
+          style={{ backgroundColor: `${tokens.colors.danger}22`, color: tokens.colors.danger }}
+        >
+          {t('game.reconnecting')}
+        </div>
+      )}
+      {saveError && (
+        <div
+          className="text-xs text-center py-1.5 rounded-lg"
+          role="alert"
+          style={{ backgroundColor: `${tokens.colors.danger}22`, color: tokens.colors.danger }}
+        >
+          {saveError}
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

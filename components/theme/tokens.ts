@@ -15,7 +15,6 @@ export type ThemeColors = {
 
 export type ThemeTokens = {
   key: ThemeKey;
-  label: { 'zh-CN': string; en: string };
   colors: ThemeColors;
   fonts: { display: string; ui: string };
   dice: {
@@ -30,7 +29,6 @@ export type ThemeTokens = {
 export const THEMES: Record<ThemeKey, ThemeTokens> = {
   'modern-minimal': {
     key: 'modern-minimal',
-    label: { 'zh-CN': '现代极简', en: 'Modern Minimal' },
     colors: {
       bg: 'oklch(0.12 0.02 250)',
       surface: 'oklch(0.18 0.03 250)',
@@ -50,7 +48,6 @@ export const THEMES: Record<ThemeKey, ThemeTokens> = {
   },
   'classic-bar': {
     key: 'classic-bar',
-    label: { 'zh-CN': '经典酒桌', en: 'Classic Bar' },
     colors: {
       bg: 'oklch(0.25 0.04 60)',
       surface: 'oklch(0.32 0.05 60)',
@@ -70,7 +67,6 @@ export const THEMES: Record<ThemeKey, ThemeTokens> = {
   },
   'hk-neon': {
     key: 'hk-neon',
-    label: { 'zh-CN': '港风霓虹', en: 'HK Neon' },
     colors: {
       bg: 'oklch(0.15 0.04 320)',
       surface: 'oklch(0.22 0.06 320)',
@@ -90,7 +86,6 @@ export const THEMES: Record<ThemeKey, ThemeTokens> = {
   },
   cartoon: {
     key: 'cartoon',
-    label: { 'zh-CN': '卡通可爱', en: 'Cartoon' },
     colors: {
       bg: 'oklch(0.95 0.03 70)',
       surface: 'oklch(1 0.02 70)',

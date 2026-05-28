@@ -336,7 +336,10 @@ function mapApiReason(reason: string | undefined): string {
       return 'roomFull';
     case 'game_in_progress':
       return 'gameInProgress';
+    case 'game_ended':
+      return 'gameEnded';
     case 'session_expired':
+    case 'no_session':
       return 'sessionExpired';
     case 'empty':
       return 'empty';
@@ -344,6 +347,12 @@ function mapApiReason(reason: string | undefined): string {
       return 'tooLong';
     case 'invalid_chars':
       return 'invalidChars';
+    case 'invalid_code':
+      return 'invalidCode';
+    case 'rate_limited':
+      return 'rateLimited';
+    case 'code_collision':
+      return 'tryAgain';
     default:
       return 'network';
   }

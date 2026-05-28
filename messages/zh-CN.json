@@ -98,7 +98,10 @@
     "eliminated": "已出局",
     "challengeConfirm": "确定开牌？",
     "challengeConfirmBtn": "确认开!",
-    "diceLeftLabel": "剩 {n} 颗骰"
+    "diceLeftLabel": "剩 {n} 颗骰",
+    "reconnecting": "重新连接中…",
+    "disconnected": "已断开连接",
+    "rejoin": "重新加入"
   },
   "errors": {
     "network": "网络错误",
@@ -120,7 +123,11 @@
     "notYourTurn": "现在不是你的回合",
     "stale": "状态已变，正在同步",
     "countExceedsDice": "数量不能超过场上骰子总数",
-    "palificoCountLocked": "Palifico 回合数量锁定，只能加点数"
+    "palificoCountLocked": "Palifico 回合数量锁定，只能加点数",
+    "gameEnded": "游戏已结束",
+    "invalidCode": "邀请码格式不对",
+    "rateLimited": "操作太频繁，请稍候再试",
+    "tryAgain": "出了点问题，请重试"
   },
   "customization": {
     "title": "规则设定",
@@ -141,7 +148,9 @@
     "avatarHelper": "每个人选自己的骰子套装作 ID",
     "enterAvatarPicker": "进入玩家自选",
     "save": "保存",
-    "onlyOwnerCanEdit": "只有房主可以修改规则"
+    "onlyOwnerCanEdit": "只有房主可以修改规则",
+    "saveFailed": "保存失败，规则未生效",
+    "midGameLocked": "游戏中无法修改规则"
   },
   "themes": {
     "modern-minimal": "现代极简",

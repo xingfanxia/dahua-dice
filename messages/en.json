@@ -98,7 +98,10 @@
     "eliminated": "eliminated",
     "challengeConfirm": "Open the cups?",
     "challengeConfirmBtn": "Confirm",
-    "diceLeftLabel": "{n} dice left"
+    "diceLeftLabel": "{n} dice left",
+    "reconnecting": "Reconnecting…",
+    "disconnected": "Disconnected",
+    "rejoin": "Rejoin"
   },
   "errors": {
     "network": "Network error",
@@ -120,7 +123,11 @@
     "notYourTurn": "Not your turn",
     "stale": "State changed, syncing",
     "countExceedsDice": "Count can't exceed the dice on the table",
-    "palificoCountLocked": "Palifico locks the count — raise the face only"
+    "palificoCountLocked": "Palifico locks the count — raise the face only",
+    "gameEnded": "This game has ended",
+    "invalidCode": "Invalid invite code",
+    "rateLimited": "Too many requests — slow down",
+    "tryAgain": "Something went wrong, please retry"
   },
   "customization": {
     "title": "Rules",
@@ -141,7 +148,9 @@
     "avatarHelper": "Each player picks their dice texture as ID",
     "enterAvatarPicker": "Enter player picker",
     "save": "Save",
-    "onlyOwnerCanEdit": "Only the host can edit rules"
+    "onlyOwnerCanEdit": "Only the host can edit rules",
+    "saveFailed": "Save failed — rules unchanged",
+    "midGameLocked": "Can't change rules mid-game"
   },
   "themes": {
     "modern-minimal": "Modern Minimal",

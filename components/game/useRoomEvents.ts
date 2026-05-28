@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export type RoomEvent = {
   type: string;
@@ -8,22 +8,31 @@ export type RoomEvent = {
   version: number;
 };
 
+export type ConnStatus = 'connecting' | 'open' | 'error';
+
 /**
- * Subscribe to a room's SSE channel. Re-establishes the EventSource on disconnect.
+ * Subscribe to a room's SSE channel. Re-establishes the EventSource on disconnect
+ * and exposes a connection `status` so the UI can surface a reconnect banner.
  *
- * NB: EventSource in browsers handles auto-reconnect, but we explicitly close + reopen
- * on visibility change to recover quickly when a phone wakes up.
+ * NB: EventSource auto-reconnects, but we also explicitly close + reopen on
+ * visibility change to recover quickly when a phone wakes up.
  */
-export function useRoomEvents(code: string, onEvent: (event: RoomEvent) => void) {
+export function useRoomEvents(
+  code: string,
+  onEvent: (event: RoomEvent) => void,
+): { status: ConnStatus } {
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
+  const [status, setStatus] = useState<ConnStatus>('connecting');
 
   useEffect(() => {
     let es: EventSource | null = null;
 
     function open() {
       es?.close();
+      setStatus('connecting');
       es = new EventSource(`/api/stream/${code}`);
+      es.onopen = () => setStatus('open');
       es.onmessage = (msg) => {
         // Upstash REST /subscribe SSE format is:
         //   "subscribe,<channel>,<refcount>"   — initial ack, ignore
@@ -51,7 +60,9 @@ export function useRoomEvents(code: string, onEvent: (event: RoomEvent) => void)
         }
       };
       es.onerror = () => {
-        // Browser will auto-reconnect; we don't need to handle here
+        // EventSource auto-reconnects; surface the dropped state so the UI can
+        // show a reconnect banner until onopen fires again.
+        setStatus('error');
       };
     }
 
@@ -66,4 +77,6 @@ export function useRoomEvents(code: string, onEvent: (event: RoomEvent) => void)
       document.removeEventListener('visibilitychange', handleVisible);
     };
   }, [code]);
+
+  return { status };
 }
