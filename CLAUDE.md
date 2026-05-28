@@ -33,7 +33,7 @@
 | i18n | `next-intl` (zh-CN default + en) |
 | UI | Tailwind v4 + Zustand-style local state (no external state lib yet) |
 | Lint | Biome v2 (replaces ESLint + Prettier; CSS formatter disabled — Tailwind v4 syntax incompatible) |
-| Test | Vitest (71 tests) + Playwright (scaffolded only, no tests yet) |
+| Test | Vitest (71 unit/integration) + Playwright e2e (happy-path / reconnect / axe a11y, chromium + webkit) |
 
 ## Commands
 
@@ -41,6 +41,7 @@
 pnpm dev            # http://localhost:3000
 pnpm build          # production build (~1.5-2s)
 pnpm test           # 71 unit + integration tests
+pnpm e2e            # Playwright e2e (needs pnpm dev or auto-starts one); browsers: playwright install chromium webkit
 pnpm lint:fix       # Biome autofix
 vercel env pull .env.local --environment=production   # canonical env (Upstash vars live in Production scope)
 vercel --prod --scope panpanmao   # deploy
@@ -56,7 +57,7 @@ vercel --prod --scope panpanmao   # deploy
 | GET | `/api/room/[code]` | Public room info (phase, playerCount, joinable) |
 | GET | `/api/room/[code]/full` | Full RoomState (for polling) |
 | GET | `/api/room/[code]/all-hands` | Reveal-only: all players' dice |
-| POST | `/api/action` | Universal action (join/start/bid/challenge/updateRules) |
+| POST | `/api/action` | Universal action (join/start/bid/challenge/nextRound/leave/setAvatar/updateRules) |
 | GET | `/api/hand/[code]` | Authenticated: caller's private dice only |
 | GET | `/api/stream/[code]` | SSE pipe to Upstash subscribe channel |
 | GET | `/api/events/[code]?since=ID` | Redis Stream replay for reconnect catchup |
@@ -125,16 +126,21 @@ Generated via ffmpeg synthesis (no external assets). 4 themes × 2 formats at `p
 - **Regenerate**: `node scripts/audio/generate-sprites.mjs`
 - **Smoke-test** (browser decode + duration drift check): `node scripts/audio/smoke.mjs` (needs `pnpm dev` running)
 - **Sprite map** (hardcoded in `lib/audio/useDiceAudio.ts`): collide[0,200] / shake[200,1200,loop] / reveal[1400,800] / win[2200,1000] / lose[3200,1000] / click[4200,100], total 4300ms
-- **Quality bar**: demo-grade synthesized SFX (sine sweeps + filtered noise + tremolo). Distinct per-theme palette but not "polished CC0". Swap in real Freesound CC0 files by replacing per-segment recipes in the generator script with `-i <path>.wav` inputs.
+- **Quality bar**: synthesized SFX (layered noise + sine resonance + multi-tap echo + per-segment limiter polish). Richer than demo-grade (resonant collide "tok", dice-rattle shake) but still synth, not curated CC0. The generator wraps every segment in `withPolish()` (highpass + makeup-gain soft limiter) — length-preserving, so the 4300ms sprite map is exact. Swap in real Freesound CC0 by replacing per-segment recipes with `-i <path>.wav` inputs.
 
-## Open items (out of MVP scope — pickup in next session)
+## Open items
+
+Remaining (need a human / physical device — can't be done from a dev session):
 
 1. **Vercel SSO wall** — toggle Deployment Protection off in dashboard for public access
-2. **Real-device gyro test** — need iPhone 14 Pro + Pixel 7 / Android for DeviceMotion validation
-3. **Playwright e2e tests** — config exists, write happy-path + reconnect tests (skeleton in plan Phase 12)
-4. **Per-theme dice materials** — currently all themes use the same BoxGeometry + SVG pips; design spec calls for distinct materials (frosted glass / ivory / enamel / pastel ceramic) via shaders or texture maps
-5. **Player avatar picker UI** — `avatar` field exists in Player schema but no picker UI yet; default is `numeric`
-6. **Polished audio assets** — swap demo-grade synth SFX for curated Freesound CC0 + ElevenLabs AI generated stems (see §F of `docs/research/dice-audio-research.md`)
+2. **Real-device gyro test** — need iPhone 14 Pro + Pixel 7 / Android for DeviceMotion validation on hardware
+
+Done (2026-05-28 session):
+
+3. ~~Playwright e2e tests~~ — `tests/e2e/{happy-path,reconnect,a11y}.spec.ts`, 12 tests green on chromium + webkit; run `pnpm e2e`
+4. ~~Per-theme dice materials~~ — `components/dice/dice-materials.ts` (meshPhysicalMaterial per theme: frosted glass / ivory / enamel / ceramic) + cup materials + local Lightformer env in DiceCanvas
+5. ~~Player avatar picker UI~~ — `lib/avatars.ts` + `AvatarPicker` (12 glyphs + numeric seat badge) + `setAvatar` action/Lua (lobby-only); `AvatarBadge` across lobby/PlayerRing/RevealStage
+6. **Audio quality** — synthesis materially upgraded (resonant collide, multi-tap shake rattle, master limiter polish) but still ffmpeg-synth, not curated CC0. Swapping in Freesound CC0 needs API/auth (URLs in `docs/research/dice-audio-research.md` are page links, not direct downloads)
 
 ## Reference docs
 
