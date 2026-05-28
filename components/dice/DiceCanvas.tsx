@@ -1,11 +1,12 @@
 'use client';
 
+import { Environment, Lightformer } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
-import { Physics, RigidBody, type RapierRigidBody, CuboidCollider } from '@react-three/rapier';
+import { CuboidCollider, Physics, type RapierRigidBody, RigidBody } from '@react-three/rapier';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { oklchToHex } from '@/lib/theme/oklch-to-hex';
-import { detectTopFace, Dice } from './Dice';
+import { Dice, detectTopFace } from './Dice';
 import { DiceCup } from './DiceCup';
 
 export type DicePhase = 'idle' | 'rolling' | 'settled' | 'revealed';
@@ -77,8 +78,16 @@ export function DiceCanvas({
       style={{ touchAction: 'none' }}
     >
       <color attach="background" args={[bgHex]} />
-      <ambientLight intensity={0.6} />
+      <ambientLight intensity={0.5} />
       <directionalLight position={[5, 8, 5]} intensity={0.7} />
+      <pointLight position={[-4, 3, -2]} intensity={0.4} />
+      {/* Local env map built from in-scene lightformers — gives glass/enamel
+          dice real reflections without fetching an external HDR. */}
+      <Environment resolution={64} frames={1}>
+        <Lightformer intensity={1.2} position={[0, 5, 0]} scale={[6, 6, 1]} />
+        <Lightformer intensity={0.6} position={[4, 2, 2]} scale={[3, 3, 1]} />
+        <Lightformer intensity={0.6} position={[-4, 2, -2]} scale={[3, 3, 1]} />
+      </Environment>
       <Physics gravity={[0, -9.8, 0]} timeStep="vary">
         {/* Floor */}
         <RigidBody type="fixed" position={[0, -0.1, 0]}>

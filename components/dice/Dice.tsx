@@ -1,10 +1,11 @@
 'use client';
 
-import { RigidBody, type RapierRigidBody } from '@react-three/rapier';
+import { type RapierRigidBody, RigidBody } from '@react-three/rapier';
 import { useMemo, useRef } from 'react';
 import { Quaternion, Vector3 } from 'three';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { oklchToHex } from '@/lib/theme/oklch-to-hex';
+import { type DicePipMaterial, diceBodyMaterial, dicePipMaterial } from './dice-materials';
 
 const DICE_SIZE = 0.7;
 
@@ -48,8 +49,16 @@ export function Dice({
   forwardRef?: (ref: RapierRigidBody | null) => void;
 }) {
   const { tokens } = useTheme();
-  const faceHex = useMemo(() => oklchToHex(tokens.colors.diceFace, '#e8e8e8'), [tokens.colors.diceFace]);
-  const dotHex = useMemo(() => oklchToHex(tokens.colors.diceDot, '#1a1a1a'), [tokens.colors.diceDot]);
+  const faceHex = useMemo(
+    () => oklchToHex(tokens.colors.diceFace, '#e8e8e8'),
+    [tokens.colors.diceFace],
+  );
+  const dotHex = useMemo(
+    () => oklchToHex(tokens.colors.diceDot, '#1a1a1a'),
+    [tokens.colors.diceDot],
+  );
+  const bodyMat = useMemo(() => diceBodyMaterial(tokens.dice.material), [tokens.dice.material]);
+  const pipMat = useMemo(() => dicePipMaterial(tokens.dice.material), [tokens.dice.material]);
   const ref = useRef<RapierRigidBody>(null);
 
   return (
@@ -73,19 +82,32 @@ export function Dice({
         if (onContactForce) onContactForce(payload.totalForceMagnitude);
       }}
     >
-      <mesh>
+      <mesh castShadow={false}>
         <boxGeometry args={[DICE_SIZE, DICE_SIZE, DICE_SIZE]} />
-        <meshStandardMaterial color={faceHex} roughness={0.4} metalness={0.1} />
+        <meshPhysicalMaterial
+          color={faceHex}
+          roughness={bodyMat.roughness}
+          metalness={bodyMat.metalness}
+          clearcoat={bodyMat.clearcoat}
+          clearcoatRoughness={bodyMat.clearcoatRoughness}
+          transmission={bodyMat.transmission}
+          thickness={bodyMat.thickness}
+          ior={bodyMat.ior}
+          reflectivity={bodyMat.reflectivity}
+          sheen={bodyMat.sheen}
+          sheenColor={faceHex}
+          envMapIntensity={bodyMat.envMapIntensity}
+        />
       </mesh>
       {/* Pips: render as small spheres per face, positioned by face number */}
       {[1, 2, 3, 4, 5, 6].map((face) => (
-        <DicePips key={face} face={face} color={dotHex} />
+        <DicePips key={face} face={face} color={dotHex} mat={pipMat} />
       ))}
     </RigidBody>
   );
 }
 
-function DicePips({ face, color }: { face: number; color: string }) {
+function DicePips({ face, color, mat }: { face: number; color: string; mat: DicePipMaterial }) {
   // Pip positions per face — face index → offset on which axis the pips sit
   const offset = DICE_SIZE / 2 + 0.001;
   const pipRadius = 0.06;
@@ -129,7 +151,10 @@ function DicePips({ face, color }: { face: number; color: string }) {
   // Map face number → (rotation, position-of-face-on-cube)
   // Standard die: 1↔6, 2↔5, 3↔4 are opposite faces
   // We map to FACE_NORMALS above: face 5 = +Y, face 2 = -Y, face 1 = +X, face 6 = -X, face 3 = +Z, face 4 = -Z
-  const faceToTransform: Record<number, { pos: [number, number, number]; rot: [number, number, number] }> = {
+  const faceToTransform: Record<
+    number,
+    { pos: [number, number, number]; rot: [number, number, number] }
+  > = {
     1: { pos: [offset, 0, 0], rot: [0, Math.PI / 2, 0] },
     6: { pos: [-offset, 0, 0], rot: [0, -Math.PI / 2, 0] },
     5: { pos: [0, offset, 0], rot: [-Math.PI / 2, 0, 0] },
@@ -150,7 +175,12 @@ function DicePips({ face, color }: { face: number; color: string }) {
           position={[p[0], p[1], 0]}
         >
           <sphereGeometry args={[pipRadius, 12, 12]} />
-          <meshStandardMaterial color={color} roughness={0.6} />
+          <meshPhysicalMaterial
+            color={color}
+            roughness={mat.roughness}
+            metalness={mat.metalness}
+            clearcoat={mat.clearcoat}
+          />
         </mesh>
       ))}
     </group>
