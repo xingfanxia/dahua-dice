@@ -276,6 +276,15 @@ if aliveCount <= 1 then
     bidderIdx = -1, loserIdx = idx - 1, loserId = playerId, loserIds = { playerId },
     diceLost = 0, actualMeetsBid = false, gameEnded = true, winnerIdx = lastAliveIdx,
   }
+elseif state.currentTurnIdx == idx - 1 then
+  -- The departing player held the turn and the game continues — advance to the
+  -- next alive seat so the round doesn't freeze on a dead player.
+  local guard = 0
+  repeat
+    state.currentTurnIdx = (state.currentTurnIdx + 1) % n
+    guard = guard + 1
+    if guard > n then break end
+  until state.players[state.currentTurnIdx + 1].alive
 end
 state.version = state.version + 1
 redis.call('SET', stateKey, cjson.encode(state), 'EX', 21600)

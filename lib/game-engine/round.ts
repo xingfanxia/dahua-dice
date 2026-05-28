@@ -273,7 +273,8 @@ export function prepareNextRound(state: RoomState): {
 } {
   if (state.phase !== 'reveal') return { ok: false, reason: 'wrong_phase' };
   const res = state.lastChallengeResult;
-  if (res?.gameEnded) {
+  if (!res) return { ok: false, reason: 'no_result' };
+  if (res.gameEnded) {
     return { ok: true, state: { ...state, phase: 'game_end', version: state.version + 1 } };
   }
 
@@ -286,14 +287,17 @@ export function prepareNextRound(state: RoomState): {
   let openerIdx: number;
 
   if (state.rules.paliFicoVariant && freshOnes.length > 0) {
-    const opener = freshOnes[0];
+    // The player who just dropped to 1 die opens (research §3.4 "他永远先叫"). If
+    // several dropped at once, prefer the round loser, else lowest seat. Mark every
+    // current 1-die player so each only ever triggers Palifico once.
+    const opener = freshOnes.find((p) => p.id === res.loserId) ?? freshOnes[0];
     palificoActive = true;
     palificoBidderId = opener.id;
     openerIdx = idxOf(state, opener.id);
-    // Mark every player currently at 1 die so each only triggers Palifico once.
     palificoTriggered = [...state.palificoTriggered, ...freshOnes.map((p) => p.id)];
   } else {
-    const loserIdx = res?.loserIdx ?? state.currentTurnIdx;
+    // Round loser opens the next round (or the next alive seat if eliminated).
+    const loserIdx = res.loserIdx;
     openerIdx = state.players[loserIdx]?.alive ? loserIdx : nextAliveIdx(state.players, loserIdx);
   }
 

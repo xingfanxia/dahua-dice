@@ -264,6 +264,35 @@ describe('prepareNextRound + Palifico', () => {
     expect(r.state?.bidChain).toEqual([]);
   });
 
+  it('Palifico opener prefers the round loser when several drop to 1 die at once', () => {
+    const s = makeState({
+      phase: 'reveal',
+      players: [
+        { id: 'p1', nick: 'A', avatar: 'numeric', diceLeft: 1, alive: true },
+        { id: 'p2', nick: 'B', avatar: 'numeric', diceLeft: 5, alive: true },
+        { id: 'p3', nick: 'C', avatar: 'numeric', diceLeft: 1, alive: true },
+      ],
+      lastChallengeResult: {
+        kind: 'challenge',
+        actualCount: 0,
+        verifiedBid: { count: 9, face: 4, isZhai: false },
+        bidderIdx: 2,
+        loserIdx: 2,
+        loserId: 'p3',
+        loserIds: ['p3'],
+        diceLost: 1,
+        actualMeetsBid: false,
+        gameEnded: false,
+        winnerIdx: -1,
+      },
+    });
+    const r = prepareNextRound(s);
+    expect(r.state?.palificoActive).toBe(true);
+    expect(r.state?.palificoBidderId).toBe('p3'); // the loser, not lowest-seat p1
+    expect(r.state?.currentTurnIdx).toBe(2);
+    expect((r.state?.palificoTriggered ?? []).slice().sort()).toEqual(['p1', 'p3']); // both marked
+  });
+
   it('Palifico is one-shot — an already-triggered 1-die player does not re-trigger', () => {
     const s = makeState({
       phase: 'reveal',
