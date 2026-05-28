@@ -60,6 +60,17 @@ export const actionSchema = z.discriminatedUnion('type', [
     expectedVersion: z.number().int().min(0),
   }),
   z.object({
+    type: z.literal('pi'),
+    code: codeField,
+    targetPlayerId: z.string().min(1).max(64),
+    expectedVersion: z.number().int().min(0),
+  }),
+  z.object({
+    type: z.literal('tongsha'),
+    code: codeField,
+    expectedVersion: z.number().int().min(0),
+  }),
+  z.object({
     type: z.literal('nextRound'),
     code: codeField,
     expectedVersion: z.number().int().min(0),

@@ -1,12 +1,16 @@
 /**
  * Server-side Lua scripts for atomic Redis state mutations.
  *
- * Each script takes the room state JSON, validates expected_version (CAS),
- * mutates state, persists, appends event to stream, publishes to channel.
+ * Two kinds of script:
+ *  - Simple mutations (joinRoom / startGame / placeBid / setAvatar / leaveRoom):
+ *    decode state, mutate, version-bump, persist, emit event — all atomic.
+ *  - Thin commits (commitState / commitRound): the route computes the next
+ *    RoomState in Node via the unit-tested lib/game-engine/round.ts engine, then
+ *    these scripts version-CAS and persist it. This keeps the TESTED code as the
+ *    runtime for all challenge/round resolution (开/劈/通杀/Palifico) instead of a
+ *    parallel untested Lua re-implementation.
  *
  * Returns a JSON-encoded result: `{ok: true, version, ...}` or `{ok: false, reason, ...}`.
- *
- * Refer to Upstash @upstash/redis SDK for the script execution method.
  */
 
 export const joinRoom = `
@@ -17,6 +21,9 @@ local avatar = ARGV[3]
 local raw = redis.call('GET', stateKey)
 if not raw then return cjson.encode({ok=false, reason='no_room'}) end
 local state = cjson.decode(raw)
+if state.phase == 'game_end' then
+  return cjson.encode({ok=false, reason='game_ended'})
+end
 if state.phase ~= 'lobby' then
   return cjson.encode({ok=false, reason='game_in_progress'})
 end
@@ -92,8 +99,9 @@ redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
 return cjson.encode({ok=true, version=state.version})
 `;
 
-// placeBid: validates turn, CAS, advances to next alive player.
-// Dead-loop guard prevents infinite repeat-until if state corrupts.
+// placeBid: validates turn, CAS, appends to the round's bid chain, advances to
+// next alive player. (Bid legality is checked in Node via isValidBid before this
+// runs; version-CAS guarantees the state it validated against is the committed one.)
 export const placeBid = `
 local stateKey = KEYS[1]
 local playerId = ARGV[1]
@@ -112,7 +120,11 @@ local turnPlayer = state.players[state.currentTurnIdx + 1]
 if not turnPlayer or turnPlayer.id ~= playerId then
   return cjson.encode({ok=false, reason='not_your_turn'})
 end
-state.lastBid = { count = count, face = face, isZhai = isZhai }
+-- Reset the bid chain when this is the round opener (no standing bid), then append.
+if state.lastBid == nil or state.lastBid == cjson.null then state.bidChain = {} end
+local thisBid = { count = count, face = face, isZhai = isZhai }
+state.lastBid = thisBid
+table.insert(state.bidChain, { playerId = playerId, bid = thisBid })
 if isZhai then state.isZhaiRound = true end
 local n = #state.players
 local nextIdx = state.currentTurnIdx
@@ -131,158 +143,57 @@ redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
 return cjson.encode({ok=true, version=state.version})
 `;
 
-// resolveChallenge: bidding → reveal, computes actualCount from hands hash,
-// decrements loser's diceLeft, marks alive=false if 0, persists outcome on state.
-export const resolveChallenge = `
+// commitState: version-CAS commit of a full RoomState computed in Node (challenge /
+// 劈 / 通杀 resolution, or a terminal game_end). KEYS[1]=stateKey.
+// ARGV: expectedVersion, newStateJson, eventJson, ttl.
+export const commitState = `
 local stateKey = KEYS[1]
-local handsKey = KEYS[2]
-local playerId = ARGV[1]
-local expectedVersion = tonumber(ARGV[2])
+local expectedVersion = tonumber(ARGV[1])
+local newState = ARGV[2]
+local eventJson = ARGV[3]
+local ttl = tonumber(ARGV[4])
 local raw = redis.call('GET', stateKey)
 if not raw then return cjson.encode({ok=false, reason='no_room'}) end
-local state = cjson.decode(raw)
-if state.version ~= expectedVersion then
-  return cjson.encode({ok=false, reason='stale', currentVersion=state.version})
+local cur = cjson.decode(raw)
+if cur.version ~= expectedVersion then
+  return cjson.encode({ok=false, reason='stale', currentVersion=cur.version})
 end
-if state.phase ~= 'bidding' then return cjson.encode({ok=false, reason='wrong_phase'}) end
-if not state.lastBid or state.lastBid == cjson.null then
-  return cjson.encode({ok=false, reason='no_bid_to_challenge'})
-end
-local turnPlayer = state.players[state.currentTurnIdx + 1]
-if not turnPlayer or turnPlayer.id ~= playerId then
-  return cjson.encode({ok=false, reason='not_your_turn'})
-end
-
--- Compute actual count from hands hash (JSON-encoded number[] per player)
-local handsArr = redis.call('HGETALL', handsKey)
-local handsByPlayerId = {}
-for i = 1, #handsArr, 2 do
-  handsByPlayerId[handsArr[i]] = cjson.decode(handsArr[i+1])
-end
-local wildOnesActive = (not state.lastBid.isZhai) and state.rules.aceWild
-local actualCount = 0
-for _, hand in pairs(handsByPlayerId) do
-  for _, face in ipairs(hand) do
-    if face == state.lastBid.face then
-      actualCount = actualCount + 1
-    elseif wildOnesActive and face == 1 then
-      actualCount = actualCount + 1
-    end
-  end
-end
-
-local actualMeetsBid = actualCount >= state.lastBid.count
-local challengerIdx = state.currentTurnIdx
-local n = #state.players
--- Find previous alive player as bidder
-local bidderIdx = challengerIdx
-local guard = 0
-repeat
-  bidderIdx = (bidderIdx - 1 + n) % n
-  guard = guard + 1
-  if guard > n then return cjson.encode({ok=false, reason='no_alive_players'}) end
-until state.players[bidderIdx + 1].alive and bidderIdx ~= challengerIdx
-local loserIdx = challengerIdx
-if not actualMeetsBid then loserIdx = bidderIdx end
-
-local loser = state.players[loserIdx + 1]
-loser.diceLeft = loser.diceLeft - 1
-if loser.diceLeft <= 0 then
-  loser.alive = false
-end
-
-local aliveCount = 0
-local lastAliveIdx = -1
-for i = 1, n do
-  if state.players[i].alive then
-    aliveCount = aliveCount + 1
-    lastAliveIdx = i - 1
-  end
-end
-
-state.phase = 'reveal'
-state.lastChallengeResult = {
-  actualCount = actualCount,
-  bidderIdx = bidderIdx,
-  loserIdx = loserIdx,
-  loserId = loser.id,
-  actualMeetsBid = actualMeetsBid,
-  gameEnded = aliveCount <= 1,
-  winnerIdx = (aliveCount <= 1) and lastAliveIdx or -1,
-}
-state.version = state.version + 1
-redis.call('SET', stateKey, cjson.encode(state), 'EX', 21600)
-local payload = cjson.encode({type='challenge_resolved', payload=state.lastChallengeResult, version=state.version})
-redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', payload)
-redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
-return cjson.encode({ok=true, version=state.version, result=state.lastChallengeResult})
+redis.call('SET', stateKey, newState, 'EX', ttl)
+local decoded = cjson.decode(newState)
+redis.call('XADD', 'room:' .. cur.code .. ':events', '*', 'data', eventJson)
+redis.call('PUBLISH', 'room:' .. cur.code .. ':events', eventJson)
+return cjson.encode({ok=true, version=decoded.version})
 `;
 
-// nextRound: reveal → rolling (or game_end if only one alive). JS passes fresh hands.
-// ARGV: playerId, expectedVersion, then alternating playerId, jsonHand for each alive player.
-export const nextRound = `
+// commitRound: like commitState, but also resets the hands hash with fresh dice for
+// the new round. KEYS[1]=stateKey KEYS[2]=handsKey.
+// ARGV: expectedVersion, newStateJson, eventJson, ttl, then alternating playerId, jsonHand.
+export const commitRound = `
 local stateKey = KEYS[1]
 local handsKey = KEYS[2]
-local playerId = ARGV[1]
-local expectedVersion = tonumber(ARGV[2])
+local expectedVersion = tonumber(ARGV[1])
+local newState = ARGV[2]
+local eventJson = ARGV[3]
+local ttl = tonumber(ARGV[4])
 local raw = redis.call('GET', stateKey)
 if not raw then return cjson.encode({ok=false, reason='no_room'}) end
-local state = cjson.decode(raw)
-if state.version ~= expectedVersion then
-  return cjson.encode({ok=false, reason='stale', currentVersion=state.version})
+local cur = cjson.decode(raw)
+if cur.version ~= expectedVersion then
+  return cjson.encode({ok=false, reason='stale', currentVersion=cur.version})
 end
-if state.phase ~= 'reveal' then return cjson.encode({ok=false, reason='wrong_phase'}) end
-
-local isAlive = false
-for i = 1, #state.players do
-  if state.players[i].id == playerId and state.players[i].alive then
-    isAlive = true
-    break
-  end
-end
-if not isAlive then return cjson.encode({ok=false, reason='not_alive'}) end
-
-if state.lastChallengeResult and state.lastChallengeResult.gameEnded then
-  state.phase = 'game_end'
-  state.version = state.version + 1
-  redis.call('SET', stateKey, cjson.encode(state), 'EX', 21600)
-  local endPayload = cjson.encode({type='game_ended', payload={winnerIdx=state.lastChallengeResult.winnerIdx}, version=state.version})
-  redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', endPayload)
-  redis.call('PUBLISH', 'room:' .. state.code .. ':events', endPayload)
-  return cjson.encode({ok=true, version=state.version, gameEnded=true})
-end
-
+redis.call('SET', stateKey, newState, 'EX', ttl)
 redis.call('DEL', handsKey)
-for i = 3, #ARGV, 2 do
+for i = 5, #ARGV, 2 do
   redis.call('HSET', handsKey, ARGV[i], ARGV[i+1])
 end
-redis.call('EXPIRE', handsKey, 21600)
-
-local n = #state.players
-local nextTurnIdx = state.lastChallengeResult.loserIdx
-if not state.players[nextTurnIdx + 1].alive then
-  local guard = 0
-  repeat
-    nextTurnIdx = (nextTurnIdx + 1) % n
-    guard = guard + 1
-    if guard > n then return cjson.encode({ok=false, reason='no_alive_players'}) end
-  until state.players[nextTurnIdx + 1].alive
-end
-state.phase = 'bidding'
-state.round = state.round + 1
-state.currentTurnIdx = nextTurnIdx
-state.lastBid = cjson.null
-state.isZhaiRound = false
-state.lastChallengeResult = cjson.null
-state.version = state.version + 1
-redis.call('SET', stateKey, cjson.encode(state), 'EX', 21600)
-local roundPayload = cjson.encode({type='round_started', payload={round=state.round, currentTurnIdx=nextTurnIdx}, version=state.version})
-redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', roundPayload)
-redis.call('PUBLISH', 'room:' .. state.code .. ':events', roundPayload)
-return cjson.encode({ok=true, version=state.version})
+redis.call('EXPIRE', handsKey, ttl)
+local decoded = cjson.decode(newState)
+redis.call('XADD', 'room:' .. cur.code .. ':events', '*', 'data', eventJson)
+redis.call('PUBLISH', 'room:' .. cur.code .. ':events', eventJson)
+return cjson.encode({ok=true, version=decoded.version})
 `;
 
-// setAvatar: updates a player's cosmetic avatar id. Allowed in any phase.
+// setAvatar: updates a player's cosmetic avatar id. Lobby-only.
 export const setAvatar = `
 local stateKey = KEYS[1]
 local playerId = ARGV[1]
@@ -361,8 +272,9 @@ end
 if aliveCount <= 1 then
   state.phase = 'game_end'
   state.lastChallengeResult = {
-    actualCount = 0, bidderIdx = -1, loserIdx = idx - 1, loserId = playerId,
-    actualMeetsBid = false, gameEnded = true, winnerIdx = lastAliveIdx,
+    kind = 'challenge', actualCount = 0, verifiedBid = { count = 0, face = 1, isZhai = false },
+    bidderIdx = -1, loserIdx = idx - 1, loserId = playerId, loserIds = { playerId },
+    diceLost = 0, actualMeetsBid = false, gameEnded = true, winnerIdx = lastAliveIdx,
   }
 end
 state.version = state.version + 1

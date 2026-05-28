@@ -3,6 +3,12 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { validateNickname } from '@/lib/auth/session';
 import { readSession, updateSession } from '@/lib/auth/session-store';
 import { normalizeAvatar } from '@/lib/avatars';
+import {
+  prepareNextRound,
+  resolveChallenge,
+  resolvePi,
+  resolveTongsha,
+} from '@/lib/game-engine/round';
 import type { Face, RoomState } from '@/lib/game-engine/types';
 import { isValidBid } from '@/lib/game-engine/validate';
 import { runScript } from '@/lib/lua/run';
@@ -10,6 +16,7 @@ import { rateLimit } from '@/lib/rate-limit';
 import { redis } from '@/lib/redis';
 import { rollDice } from '@/lib/room/dice-rng';
 import { isValidInviteCode } from '@/lib/room/invite-code';
+import { GAME_TTL, normalizeState, readHands } from '@/lib/room/resolution';
 import { actionSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
@@ -18,7 +25,7 @@ export const runtime = 'nodejs';
 const ACTION_LIMIT = 30;
 const ACTION_WINDOW_SEC = 60;
 
-/** Map a Lua failure reason to the right HTTP status (client keys on `reason`; this is for correct semantics/observability). */
+/** Map a Lua/engine failure reason to the right HTTP status (client keys on `reason`; this is for correct semantics/observability). */
 function statusForReason(reason: string | undefined): number {
   switch (reason) {
     case 'no_room':
@@ -113,12 +120,15 @@ export async function POST(req: NextRequest) {
     case 'bid': {
       const state = await redis.get<RoomState>(stateKey);
       if (!state) return NextResponse.json({ ok: false, reason: 'no_room' }, { status: 404 });
-      const alive = state.players.filter((p) => p.alive).length;
+      const ns = normalizeState(state);
+      const alive = ns.players.filter((p) => p.alive).length;
+      const totalDice = ns.players.reduce((sum, p) => sum + (p.alive ? p.diceLeft : 0), 0);
       const validation = isValidBid(
-        state.lastBid,
+        ns.lastBid,
         { count: body.count, face: body.face as Face, isZhai: body.isZhai },
-        state.rules,
+        ns.rules,
         alive,
+        { totalDice, palifico: ns.palificoActive },
       );
       if (!validation.ok) {
         return NextResponse.json({ ok: false, reason: validation.reason }, { status: 400 });
@@ -139,33 +149,102 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    case 'challenge': {
-      const result = await runScript(
-        'resolveChallenge',
-        [stateKey, handsKey],
-        [session.playerId, String(body.expectedVersion)],
+    case 'challenge':
+    case 'pi':
+    case 'tongsha': {
+      // All three read state + hands, resolve via the unit-tested round engine in
+      // Node, then commit the computed state atomically via version-CAS.
+      const state = await redis.get<RoomState>(stateKey);
+      if (!state) return NextResponse.json({ ok: false, reason: 'no_room' }, { status: 404 });
+      if (state.version !== body.expectedVersion) {
+        return NextResponse.json(
+          { ok: false, reason: 'stale', currentVersion: state.version },
+          { status: 409 },
+        );
+      }
+      const hands = await readHands(handsKey);
+      const ns = normalizeState(state);
+      const r =
+        body.type === 'challenge'
+          ? resolveChallenge(ns, hands, session.playerId)
+          : body.type === 'pi'
+            ? resolvePi(ns, hands, session.playerId, body.targetPlayerId)
+            : resolveTongsha(ns, hands, session.playerId);
+      if (!r.ok) {
+        return NextResponse.json(
+          { ok: false, reason: r.reason },
+          { status: statusForReason(r.reason) },
+        );
+      }
+      const committed = await runScript(
+        'commitState',
+        [stateKey],
+        [
+          String(state.version),
+          JSON.stringify(r.state),
+          JSON.stringify({ type: `${body.type}_resolved`, version: r.state.version }),
+          String(GAME_TTL),
+        ],
       );
-      return NextResponse.json(result, {
-        status: result.ok ? 200 : statusForReason(result.reason),
+      return NextResponse.json(committed, {
+        status: committed.ok ? 200 : statusForReason(committed.reason),
       });
     }
 
     case 'nextRound': {
       const state = await redis.get<RoomState>(stateKey);
       if (!state) return NextResponse.json({ ok: false, reason: 'no_room' }, { status: 404 });
-      // Generate fresh hands for all alive players
-      const handArgs: string[] = [];
-      for (const p of state.players) {
-        if (!p.alive) continue;
-        handArgs.push(p.id, JSON.stringify(rollDice(p.diceLeft, state.rules.diceSides)));
+      if (!state.players.some((p) => p.id === session.playerId)) {
+        return NextResponse.json({ ok: false, reason: 'not_in_room' }, { status: 403 });
       }
-      const result = await runScript(
-        'nextRound',
+      if (state.version !== body.expectedVersion) {
+        return NextResponse.json(
+          { ok: false, reason: 'stale', currentVersion: state.version },
+          { status: 409 },
+        );
+      }
+      const r = prepareNextRound(normalizeState(state));
+      if (!r.ok || !r.state) {
+        return NextResponse.json(
+          { ok: false, reason: r.reason ?? 'wrong_phase' },
+          { status: statusForReason(r.reason) },
+        );
+      }
+      const newState = r.state;
+      if (newState.phase === 'game_end') {
+        const committed = await runScript(
+          'commitState',
+          [stateKey],
+          [
+            String(state.version),
+            JSON.stringify(newState),
+            JSON.stringify({ type: 'game_ended', version: newState.version }),
+            String(GAME_TTL),
+          ],
+        );
+        return NextResponse.json(committed, {
+          status: committed.ok ? 200 : statusForReason(committed.reason),
+        });
+      }
+      // Deal fresh hands for all alive players, then commit + reset the hands hash.
+      const handArgs: string[] = [];
+      for (const p of newState.players) {
+        if (!p.alive) continue;
+        handArgs.push(p.id, JSON.stringify(rollDice(p.diceLeft, newState.rules.diceSides)));
+      }
+      const committed = await runScript(
+        'commitRound',
         [stateKey, handsKey],
-        [session.playerId, String(body.expectedVersion), ...handArgs],
+        [
+          String(state.version),
+          JSON.stringify(newState),
+          JSON.stringify({ type: 'round_started', version: newState.version }),
+          String(GAME_TTL),
+          ...handArgs,
+        ],
       );
-      return NextResponse.json(result, {
-        status: result.ok ? 200 : statusForReason(result.reason),
+      return NextResponse.json(committed, {
+        status: committed.ok ? 200 : statusForReason(committed.reason),
       });
     }
 
