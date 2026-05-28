@@ -293,3 +293,37 @@ redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', payload)
 redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
 return cjson.encode({ok=true, version=state.version})
 `;
+
+// rematch: owner-only reset of a finished game back to the lobby with the same
+// players. (Empty {}/array fields are coerced by normalizeState on the next read.)
+export const rematch = `
+local stateKey = KEYS[1]
+local handsKey = KEYS[2]
+local playerId = ARGV[1]
+local raw = redis.call('GET', stateKey)
+if not raw then return cjson.encode({ok=false, reason='no_room'}) end
+local state = cjson.decode(raw)
+if state.ownerId ~= playerId then return cjson.encode({ok=false, reason='not_owner'}) end
+if state.phase ~= 'game_end' then return cjson.encode({ok=false, reason='wrong_phase'}) end
+for i = 1, #state.players do
+  state.players[i].diceLeft = state.rules.diceCount
+  state.players[i].alive = true
+end
+state.phase = 'lobby'
+state.round = 0
+state.currentTurnIdx = 0
+state.lastBid = cjson.null
+state.bidChain = {}
+state.isZhaiRound = false
+state.palificoActive = false
+state.palificoBidderId = cjson.null
+state.palificoTriggered = {}
+state.lastChallengeResult = cjson.null
+state.version = state.version + 1
+redis.call('DEL', handsKey)
+redis.call('SET', stateKey, cjson.encode(state), 'EX', 1800)
+local payload = cjson.encode({type='rematch', payload={}, version=state.version})
+redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', payload)
+redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
+return cjson.encode({ok=true, version=state.version})
+`;

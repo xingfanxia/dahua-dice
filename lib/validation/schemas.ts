@@ -46,6 +46,7 @@ export const actionSchema = z.discriminatedUnion('type', [
     avatar: z.string().max(32).optional(),
   }),
   z.object({ type: z.literal('start'), code: codeField }),
+  z.object({ type: z.literal('rematch'), code: codeField }),
   z.object({
     type: z.literal('bid'),
     code: codeField,

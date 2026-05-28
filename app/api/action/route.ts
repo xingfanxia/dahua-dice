@@ -248,6 +248,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    case 'rematch': {
+      const result = await runScript('rematch', [stateKey, handsKey], [session.playerId]);
+      return NextResponse.json(result, {
+        status: result.ok ? 200 : statusForReason(result.reason),
+      });
+    }
+
     case 'leave': {
       const result = await runScript('leaveRoom', [stateKey], [session.playerId]);
       // Clear currentRoom on session even if removal failed (best-effort)

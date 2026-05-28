@@ -420,6 +420,7 @@ function GameView({
   const [peeking, setPeeking] = useState(false);
   const [busy, setBusy] = useState(false);
   const audio = useDiceAudio();
+  const router = useRouter();
   const phaseRef = useRef(state.phase);
   phaseRef.current = state.phase;
 
@@ -571,6 +572,33 @@ function GameView({
     }
   }
 
+  async function submitRematch() {
+    setBusy(true);
+    try {
+      await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'rematch', code }),
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function leaveGame() {
+    try {
+      await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'leave', code }),
+      });
+    } finally {
+      router.push('/');
+    }
+  }
+
+  const isOwner = state.ownerId === myPlayerId;
+
   return (
     <section className="flex-1 flex flex-col gap-4">
       {/* Screen-reader announcer for turn / phase / standing bid (spec §17C). */}
@@ -678,6 +706,27 @@ function GameView({
               })}
             </p>
           )}
+          <div className="flex gap-3 mt-2 w-full">
+            {isOwner && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={submitRematch}
+                className="flex-1 py-3 min-h-[44px] rounded-2xl font-medium disabled:opacity-40"
+                style={{ backgroundColor: tokens.colors.primary, color: tokens.colors.bg }}
+              >
+                {t('game.rematch')}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={leaveGame}
+              className="flex-1 py-3 min-h-[44px] rounded-2xl font-medium"
+              style={{ backgroundColor: tokens.colors.surface, color: tokens.colors.textMuted }}
+            >
+              {t('game.disband')}
+            </button>
+          </div>
         </div>
       )}
     </section>

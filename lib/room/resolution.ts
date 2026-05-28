@@ -35,11 +35,13 @@ export async function readHands(handsKey: string): Promise<Hands> {
  * Palifico fields existed don't crash the resolution engine during a deploy window.
  */
 export function normalizeState(state: RoomState): RoomState {
+  // Array.isArray (not `?? []`): Lua's cjson encodes an empty table as `{}`, which
+  // arrives as an object — coerce those back to [] so .includes/.length are safe.
   return {
     ...state,
-    bidChain: state.bidChain ?? [],
+    bidChain: Array.isArray(state.bidChain) ? state.bidChain : [],
     palificoActive: state.palificoActive ?? false,
     palificoBidderId: state.palificoBidderId ?? null,
-    palificoTriggered: state.palificoTriggered ?? [],
+    palificoTriggered: Array.isArray(state.palificoTriggered) ? state.palificoTriggered : [],
   };
 }
