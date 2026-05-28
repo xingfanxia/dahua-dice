@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { THEME_KEYS, type ThemeKey } from '@/components/theme/tokens';
-import { DEFAULT_RULES, type GameRules } from '@/lib/game-engine/types';
+import type { GameRules } from '@/lib/game-engine/types';
 
 export function CustomizationDrawer({
   open,
@@ -34,8 +34,10 @@ export function CustomizationDrawer({
   if (!open) return null;
 
   function handleSave() {
+    // Spread current rules (not DEFAULT_RULES) so non-edited fields like
+    // diceSides / startingBidFactor are preserved across a save.
     onSaveRules({
-      ...DEFAULT_RULES,
+      ...rules,
       diceCount,
       aceWild,
       allowZhai,
