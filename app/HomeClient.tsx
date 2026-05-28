@@ -278,7 +278,7 @@ export function HomeClient({
         {/* footer — theme picker */}
         <footer className="mt-auto max-w-md pt-12">
           <div className="border-t border-text-muted/15 pt-6">
-            <span className="font-ui text-[11px] uppercase tracking-[0.16em] text-text-muted/70">
+            <span className="font-ui text-[11px] uppercase tracking-[0.16em] text-text-muted">
               {t('common.settings')}
             </span>
             <div className="mt-3 flex flex-wrap gap-2">

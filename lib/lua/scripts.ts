@@ -290,6 +290,8 @@ local avatar = ARGV[2]
 local raw = redis.call('GET', stateKey)
 if not raw then return cjson.encode({ok=false, reason='no_room'}) end
 local state = cjson.decode(raw)
+-- Lobby-only: bumping state.version mid-game would race version-CAS bids.
+if state.phase ~= 'lobby' then return cjson.encode({ok=false, reason='wrong_phase'}) end
 local found = false
 for i = 1, #state.players do
   if state.players[i].id == playerId then
@@ -300,9 +302,7 @@ for i = 1, #state.players do
 end
 if not found then return cjson.encode({ok=false, reason='not_in_room'}) end
 state.version = state.version + 1
-local ttl = 21600
-if state.phase == 'lobby' then ttl = 1800 end
-redis.call('SET', stateKey, cjson.encode(state), 'EX', ttl)
+redis.call('SET', stateKey, cjson.encode(state), 'EX', 1800)
 local payload = cjson.encode({type='avatar_updated', payload={playerId=playerId, avatar=avatar}, version=state.version})
 redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', payload)
 redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)

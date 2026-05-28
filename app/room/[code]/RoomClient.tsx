@@ -119,16 +119,28 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
   }
 
   async function handleSetAvatar(avatar: string) {
-    // Optimistic: reflect locally immediately; SSE refetch reconciles.
+    const prevAvatar = state.players.find((p) => p.id === myPlayerId)?.avatar ?? 'numeric';
+    // Optimistic: reflect locally immediately; SSE refetch reconciles on success.
     setState((prev) => ({
       ...prev,
       players: prev.players.map((p) => (p.id === myPlayerId ? { ...p, avatar } : p)),
     }));
-    await fetch('/api/action', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'setAvatar', code, avatar }),
-    });
+    try {
+      const r = await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'setAvatar', code, avatar }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.reason ?? 'failed');
+    } catch {
+      // The success refetch is version-gated and won't revert a failed write, so
+      // roll back the optimistic change here.
+      setState((prev) => ({
+        ...prev,
+        players: prev.players.map((p) => (p.id === myPlayerId ? { ...p, avatar: prevAvatar } : p)),
+      }));
+    }
   }
 
   return (
