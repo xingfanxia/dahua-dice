@@ -15,12 +15,30 @@ export function isValidBid(
   next: Bid,
   rules: GameRules,
   alivePlayers: number,
+  opts?: { totalDice?: number; palifico?: boolean },
 ): BidValidation {
-  if (next.isZhai && !rules.allowZhai) return { ok: false, reason: 'zhai_disabled' };
   if (!Number.isInteger(next.count) || next.count < 1)
     return { ok: false, reason: 'invalid_count' };
   if (!Number.isInteger(next.face) || next.face < 1 || next.face > rules.diceSides)
     return { ok: false, reason: 'invalid_face' };
+  // Anti-grief: a bid can never exceed the dice physically on the table.
+  if (opts?.totalDice != null && next.count > opts.totalDice)
+    return { ok: false, reason: 'count_exceeds_dice' };
+
+  // Palifico round (research §3.4): its own regime — 1s are not wild (handled at
+  // resolution), the count is locked to the opener's, and raises are face-only.
+  // The opener uses the zhai threshold since 1s don't count.
+  if (opts?.palifico) {
+    if (!prev) {
+      if (next.count < alivePlayers) return { ok: false, reason: 'below_starting' };
+      return { ok: true };
+    }
+    if (next.count !== prev.count) return { ok: false, reason: 'palifico_count_locked' };
+    if (next.face > prev.face) return { ok: true };
+    return { ok: false, reason: 'not_higher' };
+  }
+
+  if (next.isZhai && !rules.allowZhai) return { ok: false, reason: 'zhai_disabled' };
 
   // 叫1必斋 (research §2.3): a face-1 bid is incoherent as a 飞 call — 1 is both
   // the named face AND the wild — so bidding face 1 must enter the zhai state.

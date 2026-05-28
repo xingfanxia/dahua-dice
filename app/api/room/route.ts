@@ -66,12 +66,16 @@ export async function POST(req: NextRequest) {
     ownerId: session.playerId,
     currentTurnIdx: 0,
     lastBid: null,
+    bidChain: [],
     isZhaiRound: false,
     round: 0,
     rules: DEFAULT_RULES,
     theme: session.theme,
     version: 1,
     createdAt: Date.now(),
+    palificoActive: false,
+    palificoBidderId: null,
+    palificoTriggered: [],
   };
   await redis.set(`room:${code}:state`, state, { ex: LOBBY_TTL });
   // Pin session to this room so reconnects + /api/whoami can route the user back

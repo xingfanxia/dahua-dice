@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { resolveChallenge } from '@/lib/game-engine/resolve';
-import { applyTransition } from '@/lib/game-engine/state-machine';
-import { type Bid, DEFAULT_RULES, type RoomState } from '@/lib/game-engine/types';
+import {
+  type Hands,
+  prepareNextRound,
+  resolveChallenge,
+  resolveTongsha,
+} from '@/lib/game-engine/round';
+import { type Bid, DEFAULT_RULES, type GameRules, type RoomState } from '@/lib/game-engine/types';
 import { isValidBid } from '@/lib/game-engine/validate';
 
-function newGame(): RoomState {
+function newGame(rules: GameRules = DEFAULT_RULES): RoomState {
   return {
     code: 'GAME01',
-    phase: 'lobby',
+    phase: 'bidding',
     players: [
       { id: 'p1', nick: 'Alice', avatar: 'numeric', diceLeft: 5, alive: true },
       { id: 'p2', nick: 'Bob', avatar: 'emoji', diceLeft: 5, alive: true },
@@ -16,91 +20,122 @@ function newGame(): RoomState {
     ownerId: 'p1',
     currentTurnIdx: 0,
     lastBid: null,
+    bidChain: [],
     isZhaiRound: false,
-    round: 0,
-    rules: DEFAULT_RULES,
+    round: 1,
+    rules,
     theme: 'modern-minimal',
     version: 1,
-    createdAt: Date.now(),
+    createdAt: 0,
+    palificoActive: false,
+    palificoBidderId: null,
+    palificoTriggered: [],
   };
 }
 
-describe('full-game integration', () => {
-  it('plays one complete round: start → bid → bid → challenge → resolve', () => {
+/** Simulate the placeBid Lua: validate, append to chain, advance to next alive player. */
+function placeBid(state: RoomState, bid: Bid): RoomState {
+  const alive = state.players.filter((p) => p.alive).length;
+  const totalDice = state.players.reduce((s, p) => s + (p.alive ? p.diceLeft : 0), 0);
+  const v = isValidBid(state.lastBid, bid, state.rules, alive, {
+    totalDice,
+    palifico: state.palificoActive,
+  });
+  if (!v.ok) throw new Error(`invalid bid: ${v.reason}`);
+  const playerId = state.players[state.currentTurnIdx].id;
+  let idx = state.currentTurnIdx;
+  do {
+    idx = (idx + 1) % state.players.length;
+  } while (!state.players[idx].alive);
+  return {
+    ...state,
+    lastBid: bid,
+    bidChain: [...state.bidChain, { playerId, bid }],
+    currentTurnIdx: idx,
+    isZhaiRound: bid.isZhai || state.isZhaiRound,
+    version: state.version + 1,
+  };
+}
+
+describe('full-game integration (round.ts engine)', () => {
+  it('start → bid → bid → challenge → resolve → next round', () => {
     let state = newGame();
-    state = applyTransition(state, { type: 'start_game' });
-    expect(state.phase).toBe('rolling');
-    expect(state.round).toBe(1);
+    // Alice opens 5×4 (threshold ceil(1.5*3)=5)
+    state = placeBid(state, { count: 5, face: 4, isZhai: false });
+    expect(state.currentTurnIdx).toBe(1);
+    // Bob raises to 6×4
+    state = placeBid(state, { count: 6, face: 4, isZhai: false });
+    expect(state.currentTurnIdx).toBe(2);
 
-    state = applyTransition(state, { type: 'all_rolled' });
-    expect(state.phase).toBe('bidding');
-
-    // Hands: Alice=[4,4,1,2,3], Bob=[4,5,5,1,3], Cory=[6,6,6,6,6]
-    const hands = [
-      [4, 4, 1, 2, 3],
-      [4, 5, 5, 1, 3],
-      [6, 6, 6, 6, 6],
-    ];
-
-    // Alice opens with 5 × 4 (3 alive players → starting threshold = ceil(1.5*3) = 5)
-    const bid1: Bid = { count: 5, face: 4, isZhai: false };
-    const v1 = isValidBid(state.lastBid, bid1, state.rules, 3);
-    expect(v1.ok).toBe(true);
-    state = { ...state, lastBid: bid1, currentTurnIdx: 1, version: state.version + 1 };
-
-    // Bob bids 6 × 4
-    const bid2: Bid = { count: 6, face: 4, isZhai: false };
-    const v2 = isValidBid(state.lastBid, bid2, state.rules, 3);
-    expect(v2.ok).toBe(true);
-    state = { ...state, lastBid: bid2, currentTurnIdx: 2, version: state.version + 1 };
-
-    // Cory challenges
-    state = applyTransition(state, { type: 'challenge', challengerIdx: 2 });
+    // Cory challenges. native 4s: Alice 2 + Bob 1 = 3; wild 1s: 1 + 1 = 2 → actual 5 < 6 → Bob loses.
+    const hands: Hands = { p1: [4, 4, 1, 2, 3], p2: [4, 5, 5, 1, 3], p3: [6, 6, 6, 6, 6] };
+    const r = resolveChallenge(state, hands, 'p3');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.outcome.actualCount).toBe(5);
+    expect(r.outcome.loserId).toBe('p2');
+    state = r.state;
+    expect(state.players[1].diceLeft).toBe(4);
     expect(state.phase).toBe('reveal');
 
-    // Resolve: actual native 4s = 2 (Alice) + 1 (Bob) = 3; wild ones = 1 (Alice) + 1 (Bob) = 2; total = 5
-    // bid was 6 → actual 5 < 6 → BIDDER (Bob = idx 1) loses
-    const result = resolveChallenge(state.lastBid!, hands, state.rules, 2, 1);
-    expect(result.actualCount).toBe(5);
-    expect(result.loserIdx).toBe(1);
-
-    state = applyTransition(state, { type: 'resolve', result });
-    expect(state.players[1].diceLeft).toBe(4);
-    expect(state.phase).toBe('round_end');
+    // Advance — Bob (loser) opens the next round, chain reset.
+    const nr = prepareNextRound(state);
+    expect(nr.ok).toBe(true);
+    state = nr.state as RoomState;
+    expect(state.phase).toBe('bidding');
+    expect(state.currentTurnIdx).toBe(1);
+    expect(state.bidChain).toEqual([]);
+    expect(state.round).toBe(2);
   });
 
-  it('plays through to game_end (player elimination)', () => {
+  it('通杀 sweep removes all chain bidders when the bid is false', () => {
+    let state = newGame({
+      ...DEFAULT_RULES,
+      chineseExtensions: { pi: false, fanpi: false, tongsha: true },
+    });
+    state = placeBid(state, { count: 5, face: 4, isZhai: false }); // Alice
+    state = placeBid(state, { count: 8, face: 4, isZhai: false }); // Bob (overbid)
+    // Cory 通杀. actual = 5 < 8 → sweep Alice + Bob.
+    const hands: Hands = { p1: [4, 4, 1, 2, 3], p2: [4, 5, 5, 1, 3], p3: [6, 6, 6, 6, 6] };
+    const r = resolveTongsha(state, hands, 'p3');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.outcome.loserIds.sort()).toEqual(['p1', 'p2']);
+    expect(r.state.players[0].diceLeft).toBe(4);
+    expect(r.state.players[1].diceLeft).toBe(4);
+    expect(r.state.players[2].diceLeft).toBe(5);
+  });
+
+  it('plays through to a single survivor (game_end)', () => {
     let state = newGame();
-    // Manually whittle down to 1 alive
     state = {
       ...state,
-      phase: 'reveal',
       players: [
-        { id: 'p1', nick: 'A', avatar: '', diceLeft: 5, alive: true },
-        { id: 'p2', nick: 'B', avatar: '', diceLeft: 1, alive: true },
-        { id: 'p3', nick: 'C', avatar: '', diceLeft: 0, alive: false },
+        { id: 'p1', nick: 'A', avatar: 'numeric', diceLeft: 5, alive: true },
+        { id: 'p2', nick: 'B', avatar: 'numeric', diceLeft: 1, alive: true },
+        { id: 'p3', nick: 'C', avatar: 'numeric', diceLeft: 0, alive: false },
       ],
+      currentTurnIdx: 0,
     };
-    state = applyTransition(state, {
-      type: 'resolve',
-      result: { actualCount: 3, loserIdx: 1, actualMeetsBid: true },
-    });
-    expect(state.phase).toBe('game_end');
-    expect(state.players.filter((p) => p.alive).length).toBe(1);
+    // 6 dice on the table (Alice 5 + Bob 1) → max bid is 6. Alice bids the ceiling.
+    state = placeBid(state, { count: 6, face: 4, isZhai: false });
+    const hands: Hands = { p1: [2, 2, 3, 3, 5], p2: [6] };
+    // Bob (currentTurnIdx 1) challenges. native 4s = 0, wild 1s = 0 → actual 0 < 6 → Alice loses.
+    const r = resolveChallenge(state, hands, 'p2');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.outcome.loserId).toBe('p1');
+    // Alice 5→4, still alive; not game end yet.
+    expect(r.outcome.gameEnded).toBe(false);
   });
 
-  it('zhai opener then break-zhai sequence', () => {
+  it('zhai opener → stay-in-zhai → break-zhai (飞 needs 2×)', () => {
     const state = newGame();
-    // Zhai opener: alive=3, threshold=3
-    const zhaiBid: Bid = { count: 3, face: 4, isZhai: true };
-    expect(isValidBid(null, zhaiBid, state.rules, 3).ok).toBe(true);
-
-    // Stay-in-zhai
-    const next: Bid = { count: 4, face: 4, isZhai: true };
-    expect(isValidBid(zhaiBid, next, state.rules, 3).ok).toBe(true);
-
-    // Break out: must be >= 8 (4 × 2)
-    expect(isValidBid(next, { count: 7, face: 4, isZhai: false }, state.rules, 3).ok).toBe(false);
-    expect(isValidBid(next, { count: 8, face: 4, isZhai: false }, state.rules, 3).ok).toBe(true);
+    const zhai: Bid = { count: 3, face: 4, isZhai: true };
+    expect(isValidBid(null, zhai, state.rules, 3).ok).toBe(true);
+    const stay: Bid = { count: 4, face: 4, isZhai: true };
+    expect(isValidBid(zhai, stay, state.rules, 3).ok).toBe(true);
+    expect(isValidBid(stay, { count: 7, face: 4, isZhai: false }, state.rules, 3).ok).toBe(false);
+    expect(isValidBid(stay, { count: 8, face: 4, isZhai: false }, state.rules, 3).ok).toBe(true);
   });
 });

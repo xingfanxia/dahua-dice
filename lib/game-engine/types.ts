@@ -38,14 +38,21 @@ export type Player = {
 };
 
 export type ChallengeOutcome = {
+  kind: 'challenge' | 'pi' | 'tongsha'; // 开 / 劈 / 通杀
   actualCount: number;
-  bidderIdx: number;
-  loserIdx: number;
+  verifiedBid: Bid; // the bid that was checked against the table
+  bidderIdx: number; // who made the verified bid
+  loserIdx: number; // primary loser (for single-loser display)
   loserId: string;
+  loserIds: string[]; // every loser (通杀 sweep can be several); always includes loserId
+  diceLost: number; // dice the primary loser lost (1, or 2 for a failed 劈/通杀)
   actualMeetsBid: boolean;
   gameEnded: boolean;
   winnerIdx: number; // -1 if game not ended
 };
+
+/** One entry in a round's bid chain, used by 劈 (target a non-adjacent bidder) and 通杀 (sweep all bidders). */
+export type BidChainEntry = { playerId: string; bid: Bid };
 
 export type RoomState = {
   code: string;
@@ -54,11 +61,16 @@ export type RoomState = {
   ownerId: string;
   currentTurnIdx: number;
   lastBid: Bid | null;
+  bidChain: BidChainEntry[]; // bids placed this round, in order; reset each round
   isZhaiRound: boolean;
   round: number;
   rules: GameRules;
   theme: string;
   version: number;
   createdAt: number;
+  // Palifico (research §3.4): first time a player hits 1 die, the next round is theirs.
+  palificoActive: boolean; // current round is a Palifico round
+  palificoBidderId: string | null; // who opens the Palifico round
+  palificoTriggered: string[]; // playerIds whose one-shot Palifico has already fired
   lastChallengeResult?: ChallengeOutcome | null;
 };
