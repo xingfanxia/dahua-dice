@@ -30,6 +30,17 @@ const TMP = mkdtempSync(join(tmpdir(), 'dahua-audio-'));
 
 const SR = 44100;
 
+// Length-preserving master polish applied to every segment: clear sub-rumble,
+// then boost into a soft limiter so all SFX sit at a consistent, punchy level
+// without clipping. None of these filters change duration, so the strict sprite
+// timing (collide/shake/reveal/win/lose/click) is preserved.
+const POLISH = 'highpass=f=32,alimiter=level_in=1.4:limit=0.95:level=disabled';
+
+// Wrap a recipe filtergraph (which ends in `[out]`) with the polish chain.
+function withPolish(filter) {
+  return filter.replace(/\[out\]\s*$/, `[pre];[pre]${POLISH}[out]`);
+}
+
 // Source generator helpers — these build ffmpeg lavfi source URLs.
 // `synth(expr, d)` uses ffmpeg's expression-based audio source filter to make
 // custom waveforms (e.g. frequency sweeps for descending tones).
@@ -49,14 +60,20 @@ function sine(freq, d) {
 const recipes = {
   modern: {
     collide: () => ({
-      inputs: [noise('white', 0.2, 0.6)],
+      // Sharp noise tick + a fast-decaying pitched resonance = a clean "tok".
+      inputs: [noise('white', 0.2, 0.55), sine(1200, 0.2)],
       filter:
-        '[0]bandpass=f=2200:w=1500,afade=t=in:d=0.005,afade=t=out:d=0.18:st=0.02,volume=1.6[out]',
+        '[0]bandpass=f=2400:w=1600,afade=t=in:d=0.003,afade=t=out:d=0.16:st=0.02,volume=1.3[a];' +
+        '[1]afade=t=in:d=0.002,afade=t=out:d=0.1:st=0.01,volume=0.5[b];' +
+        '[a][b]amix=inputs=2:duration=longest:normalize=0,volume=1.3[out]',
     }),
     shake: () => ({
-      inputs: [noise('brown', 1.2, 0.45)],
+      // Body rumble + a multi-tap high layer = discrete clicks (dice rattling).
+      inputs: [noise('brown', 1.2, 0.4), noise('white', 1.2, 0.25)],
       filter:
-        '[0]highpass=f=1500,tremolo=f=16:d=0.55,afade=t=in:d=0.02,afade=t=out:d=0.03:st=1.17,volume=1.1[out]',
+        '[0]highpass=f=1200,volume=1.0[a];' +
+        '[1]highpass=f=2500,aecho=0.8:0.85:33|47|61:0.5|0.35|0.25,volume=0.7[b];' +
+        '[a][b]amix=inputs=2:duration=longest:normalize=0,tremolo=f=15:d=0.5,afade=t=in:d=0.03,afade=t=out:d=0.04:st=1.16,volume=1.0[out]',
     }),
     reveal: () => ({
       inputs: [sine(523.25, 0.8), sine(783.99, 0.8)],
@@ -88,14 +105,20 @@ const recipes = {
 
   classic: {
     collide: () => ({
-      inputs: [noise('pink', 0.2, 0.7)],
+      // Warm wooden knock — low resonant body under a pink-noise tap.
+      inputs: [noise('pink', 0.2, 0.6), sine(360, 0.2)],
       filter:
-        '[0]bandpass=f=400:w=350,afade=t=in:d=0.005,afade=t=out:d=0.18:st=0.02,volume=1.8[out]',
+        '[0]bandpass=f=450:w=400,afade=t=in:d=0.004,afade=t=out:d=0.16:st=0.02,volume=1.5[a];' +
+        '[1]afade=t=in:d=0.002,afade=t=out:d=0.12:st=0.01,volume=0.55[b];' +
+        '[a][b]amix=inputs=2:duration=longest:normalize=0,volume=1.4[out]',
     }),
     shake: () => ({
-      inputs: [noise('pink', 1.2, 0.55)],
+      // Wooden cup rattle — low body + mid multi-tap clicks.
+      inputs: [noise('pink', 1.2, 0.5), noise('pink', 1.2, 0.3)],
       filter:
-        '[0]bandpass=f=350:w=400,tremolo=f=12:d=0.6,afade=t=in:d=0.02,afade=t=out:d=0.03:st=1.17,volume=1.3[out]',
+        '[0]bandpass=f=320:w=350,volume=1.1[a];' +
+        '[1]bandpass=f=800:w=500,aecho=0.8:0.85:41|59|73:0.45|0.3|0.2,volume=0.7[b];' +
+        '[a][b]amix=inputs=2:duration=longest:normalize=0,tremolo=f=11:d=0.55,afade=t=in:d=0.03,afade=t=out:d=0.04:st=1.16,volume=1.1[out]',
     }),
     reveal: () => ({
       // Warm low chord C4 + G4
@@ -129,15 +152,20 @@ const recipes = {
 
   hk: {
     collide: () => ({
-      // Porcelain ring — band-passed pink noise + light echo
-      inputs: [noise('pink', 0.2, 0.65)],
+      // Porcelain ring — pitched body + band-passed tap with light echo.
+      inputs: [noise('pink', 0.2, 0.55), sine(950, 0.2)],
       filter:
-        '[0]bandpass=f=900:w=500,aecho=0.7:0.7:60:0.4,afade=t=in:d=0.005,afade=t=out:d=0.18:st=0.02,volume=1.6[out]',
+        '[0]bandpass=f=950:w=550,aecho=0.7:0.7:50:0.35,afade=t=in:d=0.004,afade=t=out:d=0.16:st=0.02,volume=1.3[a];' +
+        '[1]afade=t=in:d=0.002,afade=t=out:d=0.14:st=0.01,volume=0.5[b];' +
+        '[a][b]amix=inputs=2:duration=longest:normalize=0,volume=1.4[out]',
     }),
     shake: () => ({
-      inputs: [noise('white', 1.2, 0.5)],
+      // Enamel cup — mid body + bright multi-tap clicks + room echo.
+      inputs: [noise('white', 1.2, 0.45), noise('white', 1.2, 0.3)],
       filter:
-        '[0]bandpass=f=600:w=400,tremolo=f=11:d=0.55,aecho=0.7:0.5:35:0.25,afade=t=in:d=0.02,afade=t=out:d=0.03:st=1.17,volume=1.2[out]',
+        '[0]bandpass=f=600:w=400,volume=1.0[a];' +
+        '[1]bandpass=f=1400:w=800,aecho=0.8:0.7:37|53|67:0.4|0.28|0.18,volume=0.65[b];' +
+        '[a][b]amix=inputs=2:duration=longest:normalize=0,tremolo=f=12:d=0.5,aecho=0.7:0.5:30:0.2,afade=t=in:d=0.03,afade=t=out:d=0.04:st=1.16,volume=1.1[out]',
     }),
     reveal: () => ({
       // Pentatonic-ish open chord G4 + D5
@@ -171,17 +199,20 @@ const recipes = {
 
   cartoon: {
     collide: () => ({
-      // Cartoon "boop" — descending sine sweep 800→400 + small noise tail
-      inputs: [synth('sin(2*PI*(800-400*t)*t)', 0.2), noise('white', 0.2, 0.25)],
+      // Cartoon "boop" — descending sine sweep 820→400 + crisp noise tail.
+      inputs: [synth('sin(2*PI*(820-420*t)*t)', 0.2), noise('white', 0.2, 0.22)],
       filter:
-        '[0]volume=0.55[a];' +
-        '[1]highpass=f=1500,volume=0.6[b];' +
-        '[a][b]amix=inputs=2:duration=longest,afade=t=in:d=0.005,afade=t=out:d=0.15:st=0.05,volume=1.4[out]',
+        '[0]volume=0.6[a];' +
+        '[1]highpass=f=1800,afade=t=out:d=0.12:st=0.03,volume=0.5[b];' +
+        '[a][b]amix=inputs=2:duration=longest:normalize=0,afade=t=in:d=0.004,afade=t=out:d=0.14:st=0.05,volume=1.3[out]',
     }),
     shake: () => ({
-      inputs: [noise('white', 1.2, 0.5)],
+      // Bouncy plastic rattle — bright body + fast multi-tap clicks.
+      inputs: [noise('white', 1.2, 0.45), noise('white', 1.2, 0.3)],
       filter:
-        '[0]bandpass=f=800:w=600,tremolo=f=20:d=0.7,afade=t=in:d=0.02,afade=t=out:d=0.03:st=1.17,volume=1.2[out]',
+        '[0]bandpass=f=850:w=600,volume=1.0[a];' +
+        '[1]bandpass=f=1800:w=900,aecho=0.8:0.8:29|43|59:0.45|0.3|0.2,volume=0.6[b];' +
+        '[a][b]amix=inputs=2:duration=longest:normalize=0,tremolo=f=19:d=0.6,afade=t=in:d=0.03,afade=t=out:d=0.04:st=1.16,volume=1.1[out]',
     }),
     reveal: () => ({
       // Quick C5 → E5 → G5 sparkle (rest = silence)
@@ -255,7 +286,7 @@ function renderSegment(theme, segName, dur, wavPath) {
     '-y',
     ...inputArgs,
     '-filter_complex',
-    r.filter,
+    withPolish(r.filter),
     '-map',
     '[out]',
     '-t',
