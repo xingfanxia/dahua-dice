@@ -14,12 +14,23 @@ export function useShakeDetector(onShake: (intensity: number) => void) {
   const onShakeRef = useRef(onShake);
   onShakeRef.current = onShake;
 
-  // Auto-grant if previously granted
+  // Resolve initial permission. iOS gates DeviceMotion behind requestPermission();
+  // Android / desktop have no gate, so motion is available immediately — auto-grant
+  // there so shake feedback works without a redundant prompt (iOS stays 'unknown'
+  // until the user grants via requestPermission()).
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === '1') setPermission('granted');
-    else if (!('DeviceMotionEvent' in window)) setPermission('unsupported');
+    if (localStorage.getItem(STORAGE_KEY) === '1') {
+      setPermission('granted');
+      return;
+    }
+    if (!('DeviceMotionEvent' in window)) {
+      setPermission('unsupported');
+      return;
+    }
+    // biome-ignore lint/suspicious/noExplicitAny: iOS-only requestPermission probe
+    const DM = (window as any).DeviceMotionEvent;
+    if (typeof DM?.requestPermission !== 'function') setPermission('granted');
   }, []);
 
   // Subscribe to DeviceMotion when granted

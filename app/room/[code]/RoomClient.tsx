@@ -372,7 +372,8 @@ function GameView({
     if (phaseRef.current === 'rolling' || phaseRef.current === 'bidding') {
       audio.shake(intensity);
       if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-        navigator.vibrate?.(Math.floor(intensity * 30));
+        // Spec §14.4: 50–200ms, scaled by shake intensity.
+        navigator.vibrate?.(Math.floor(50 + intensity * 150));
       }
     }
   });
@@ -443,6 +444,7 @@ function GameView({
   }
 
   async function submitChallenge() {
+    audio.stinger(); // dramatic 开 sound (spec journey #10)
     setBusy(true);
     try {
       await fetch('/api/action', {
@@ -529,7 +531,12 @@ function GameView({
         className="aspect-square rounded-2xl overflow-hidden flex-shrink-0"
         style={{ backgroundColor: tokens.colors.surface }}
       >
-        <DiceScene diceCount={diceCount} phase={dicePhase} />
+        <DiceScene
+          diceCount={diceCount}
+          phase={dicePhase}
+          onCollision={(force) => audio.collide('dice', force)}
+          onAllSettled={() => audio.settle()}
+        />
       </div>
 
       {hand && state.phase !== 'reveal' && (

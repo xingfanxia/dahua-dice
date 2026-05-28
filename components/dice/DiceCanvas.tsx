@@ -8,6 +8,7 @@ import { useTheme } from '@/components/theme/ThemeProvider';
 import { oklchToHex } from '@/lib/theme/oklch-to-hex';
 import { Dice, detectTopFace } from './Dice';
 import { DiceCup } from './DiceCup';
+import { DiceFallback } from './DiceFallback';
 
 export type DicePhase = 'idle' | 'rolling' | 'settled' | 'revealed';
 
@@ -36,6 +37,19 @@ export function DiceCanvas({
       typeof window !== 'undefined' &&
       !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
   );
+  // Probe WebGL2 once: fall back to 2D SVG dice if absent (spec §11 graceful
+  // degrade), and disable MSAA on low-end GPUs (< 16 texture units).
+  const [{ webgl2, antialias }] = useState(() => {
+    if (typeof document === 'undefined') return { webgl2: true, antialias: true };
+    try {
+      const gl = document.createElement('canvas').getContext('webgl2');
+      if (!gl) return { webgl2: false, antialias: false };
+      const maxTex = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS) as number;
+      return { webgl2: true, antialias: maxTex >= 16 };
+    } catch {
+      return { webgl2: false, antialias: false };
+    }
+  });
 
   // Track when all dice are settled
   useEffect(() => {
@@ -78,10 +92,13 @@ export function DiceCanvas({
     setSettled((prev) => ({ ...prev, [idx]: face }));
   }
 
+  if (!webgl2) return <DiceFallback diceCount={diceCount} />;
+
   return (
     <Canvas
       shadows={false}
       dpr={[1, 2]}
+      gl={{ antialias }}
       camera={{ position: [0, 5, 4], fov: 35 }}
       style={{ touchAction: 'none' }}
     >
