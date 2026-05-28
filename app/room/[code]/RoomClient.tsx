@@ -159,7 +159,7 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
           <button
             type="button"
             onClick={handleCopy}
-            className="text-sm px-3 py-2 rounded-lg transition-colors"
+            className="text-sm px-3 min-h-[44px] rounded-lg transition-colors"
             style={{
               backgroundColor: tokens.colors.surface,
               color: tokens.colors.primary,
@@ -171,13 +171,13 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            className="text-sm px-3 py-2 rounded-lg transition-colors"
+            className="text-sm min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-colors"
             style={{
               backgroundColor: tokens.colors.surface,
               color: tokens.colors.text,
               border: `1px solid ${tokens.colors.textMuted}33`,
             }}
-            aria-label="settings"
+            aria-label={t('common.settings')}
           >
             ⚙
           </button>

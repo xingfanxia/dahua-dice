@@ -114,7 +114,7 @@ export function CustomizationDrawer({
                 <button
                   type="button"
                   onClick={() => setDiceCount((c) => Math.max(3, c - 1) as 3 | 4 | 5 | 6 | 7)}
-                  className="w-9 h-9 rounded-full"
+                  className="w-11 h-11 rounded-full"
                   style={{ backgroundColor: tokens.colors.surface }}
                   aria-label="−"
                 >
@@ -124,7 +124,7 @@ export function CustomizationDrawer({
                 <button
                   type="button"
                   onClick={() => setDiceCount((c) => Math.min(7, c + 1) as 3 | 4 | 5 | 6 | 7)}
-                  className="w-9 h-9 rounded-full"
+                  className="w-11 h-11 rounded-full"
                   style={{ backgroundColor: tokens.colors.surface }}
                   aria-label="+"
                 >
@@ -195,15 +195,20 @@ function Toggle({
   onChange: (v: boolean) => void;
 }) {
   const { tokens } = useTheme();
+  // The whole row is the switch so the tap target is ≥44px tall (the visual pill
+  // alone is only 28px). role=switch + aria-checked keeps it accessible.
   return (
-    <label className="flex items-center justify-between gap-3 cursor-pointer">
+    <button
+      type="button"
+      role="switch"
+      aria-checked={value}
+      aria-label={label}
+      onClick={() => onChange(!value)}
+      className="flex items-center justify-between gap-3 w-full min-h-[44px] text-left"
+    >
       <span style={{ color: tokens.colors.text }}>{label}</span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={value}
-        onClick={() => onChange(!value)}
-        className="w-12 h-7 rounded-full relative transition-colors"
+      <span
+        className="w-12 h-7 rounded-full relative transition-colors shrink-0"
         style={{
           backgroundColor: value ? tokens.colors.success : `${tokens.colors.textMuted}55`,
         }}
@@ -215,7 +220,7 @@ function Toggle({
             transform: value ? 'translateX(calc(100% + 0.5rem))' : 'translateX(0)',
           }}
         />
-      </button>
-    </label>
+      </span>
+    </button>
   );
 }

@@ -33,7 +33,10 @@ export function AvatarBadge({
       }}
     >
       {glyph ?? (
-        <span className="num font-semibold" style={{ color: 'white', fontSize: size * 0.42 }}>
+        <span
+          className="num font-semibold"
+          style={{ color: `oklch(0.98 0.02 ${hue})`, fontSize: size * 0.42 }}
+        >
           {seat}
         </span>
       )}

@@ -29,11 +29,19 @@ export function DiceCanvas({
   const [settled, setSettled] = useState<Record<number, number>>({});
   // Three.js can't parse oklch; convert via browser canvas roundtrip.
   const bgHex = useMemo(() => oklchToHex(tokens.colors.bg, '#0a0a0a'), [tokens.colors.bg]);
+  // Reduced-motion: render static dice (no tumble) — the CSS reduced-motion block
+  // can't reach the Rapier physics loop (spec §17C, vestibular safety).
+  const [reduceMotion] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+  );
 
   // Track when all dice are settled
   useEffect(() => {
     if (phase === 'rolling') {
       setSettled({});
+      if (reduceMotion) return; // static dice — no impulse/torque
       // Apply random impulse on entering rolling phase
       bodyRefs.current.forEach((body) => {
         if (!body) return;
@@ -56,7 +64,7 @@ export function DiceCanvas({
         );
       });
     }
-  }, [phase, shakeIntensity]);
+  }, [phase, shakeIntensity, reduceMotion]);
 
   useEffect(() => {
     const settledCount = Object.keys(settled).length;
@@ -88,7 +96,7 @@ export function DiceCanvas({
         <Lightformer intensity={0.6} position={[4, 2, 2]} scale={[3, 3, 1]} />
         <Lightformer intensity={0.6} position={[-4, 2, -2]} scale={[3, 3, 1]} />
       </Environment>
-      <Physics gravity={[0, -9.8, 0]} timeStep="vary">
+      <Physics gravity={[0, -9.8, 0]} timeStep="vary" paused={reduceMotion}>
         {/* Floor */}
         <RigidBody type="fixed" position={[0, -0.1, 0]}>
           <CuboidCollider args={[4, 0.1, 4]} />
@@ -103,7 +111,7 @@ export function DiceCanvas({
             /* biome-ignore lint/suspicious/noArrayIndexKey: index is the dice identity */
             key={i}
             diceIndex={i}
-            initialPosition={[(i - diceCount / 2) * 0.4, 1.5 + i * 0.4, 0]}
+            initialPosition={[(i - diceCount / 2) * 0.4, reduceMotion ? 0.3 : 1.5 + i * 0.4, 0]}
             onSettle={handleSettle}
             onContactForce={onCollision}
             forwardRef={(ref) => {
