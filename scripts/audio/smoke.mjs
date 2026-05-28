@@ -80,7 +80,7 @@ for (const r of results) {
   if (!ok) fail = true;
   console.log(
     `${ok ? '✓' : '✗'} ${r.url}: dur=${r.duration.toFixed(4)}s (drift ${driftMs.toFixed(1)}ms)` +
-    ` sr=${r.sampleRate} ch=${r.channels} samples=${r.length}`,
+      ` sr=${r.sampleRate} ch=${r.channels} samples=${r.length}`,
   );
 }
 
@@ -88,9 +88,7 @@ if (consoleErrors.length) {
   console.log('\n--- console errors / warnings during load ---');
   for (const e of consoleErrors) console.log(e);
   // Audio-related errors are blockers; other warnings are noise (e.g. dev HMR).
-  const audioErr = consoleErrors.filter((e) =>
-    /audio|Howl|sprite|decode/i.test(e),
-  );
+  const audioErr = consoleErrors.filter((e) => /audio|Howl|sprite|decode/i.test(e));
   if (audioErr.length) fail = true;
 }
 

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import type { RoomState } from '@/lib/game-engine/types';
 import { redis } from '@/lib/redis';
 import { isValidInviteCode } from '@/lib/room/invite-code';
-import type { RoomState } from '@/lib/game-engine/types';
 
 export const runtime = 'nodejs';
 

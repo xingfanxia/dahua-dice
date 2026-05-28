@@ -1,10 +1,10 @@
-import { type NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { redis } from '@/lib/redis';
-import { createSession, updateSession } from '@/lib/auth/session-store';
+import { type NextRequest, NextResponse } from 'next/server';
 import { validateNickname } from '@/lib/auth/session';
-import { generateInviteCode } from '@/lib/room/invite-code';
+import { createSession, updateSession } from '@/lib/auth/session-store';
 import { DEFAULT_RULES, type RoomState } from '@/lib/game-engine/types';
+import { redis } from '@/lib/redis';
+import { generateInviteCode } from '@/lib/room/invite-code';
 
 export const runtime = 'nodejs';
 
@@ -21,7 +21,10 @@ export async function POST(req: NextRequest) {
   const v = validateNickname(nick);
   if (!v.ok) return NextResponse.json({ ok: false, reason: v.reason }, { status: 400 });
 
-  const { token, session } = await createSession({ nick: v.value, theme: theme ?? 'modern-minimal' });
+  const { token, session } = await createSession({
+    nick: v.value,
+    theme: theme ?? 'modern-minimal',
+  });
 
   let code = generateInviteCode();
   for (let i = 0; i < 5 && (await redis.exists(`room:${code}:state`)); i++) {

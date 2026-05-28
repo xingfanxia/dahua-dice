@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
-import { isValidInviteCode } from '@/lib/room/invite-code';
-import { UPSTASH_REST_TOKEN, UPSTASH_REST_URL } from '@/lib/redis';
 import { requireMembership } from '@/lib/auth/membership';
+import { UPSTASH_REST_TOKEN, UPSTASH_REST_URL } from '@/lib/redis';
+import { isValidInviteCode } from '@/lib/room/invite-code';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

@@ -47,7 +47,7 @@ function BidChip({ bid }: { bid: Bid }) {
       {bid.isZhai && (
         <span
           className="text-xs px-2 py-0.5 rounded-full"
-          style={{ backgroundColor: tokens.colors.accent + '33', color: tokens.colors.accent }}
+          style={{ backgroundColor: `${tokens.colors.accent}33`, color: tokens.colors.accent }}
         >
           {t('game.zhai')}
         </span>

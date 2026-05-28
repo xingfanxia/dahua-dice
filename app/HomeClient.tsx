@@ -24,9 +24,7 @@ export function HomeClient({
   const nickInputRef = useRef<HTMLInputElement>(null);
 
   const validInitialCode =
-    initialJoinCode &&
-    initialJoinCode.length === CODE_LEN &&
-    CODE_ALPHABET.test(initialJoinCode)
+    initialJoinCode && initialJoinCode.length === CODE_LEN && CODE_ALPHABET.test(initialJoinCode)
       ? initialJoinCode
       : '';
 
@@ -285,12 +283,7 @@ export function HomeClient({
             </span>
             <div className="mt-3 flex flex-wrap gap-2">
               {displayThemes.map((k) => (
-                <ThemeChip
-                  key={k}
-                  themeKey={k}
-                  active={k === theme}
-                  onClick={() => setTheme(k)}
-                />
+                <ThemeChip key={k} themeKey={k} active={k === theme} onClick={() => setTheme(k)} />
               ))}
             </div>
           </div>
@@ -341,8 +334,6 @@ function mapApiReason(reason: string | undefined): string {
       return 'roomNotFound';
     case 'room_full':
       return 'roomFull';
-    case 'room_not_found':
-      return 'roomNotFound';
     case 'game_in_progress':
       return 'gameInProgress';
     case 'session_expired':

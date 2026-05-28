@@ -4,9 +4,7 @@ import { generatePlayerId, generateToken, validateNickname } from '@/lib/auth/se
 describe('generatePlayerId', () => {
   it('returns a valid UUID v4', () => {
     const id = generatePlayerId();
-    expect(id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
-    );
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
 
   it('returns unique values across calls', () => {

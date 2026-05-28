@@ -32,8 +32,7 @@ export function resolveChallenge(
     }
   }
   const actualMeetsBid = actualCount >= bid.count;
-  const inferredBidder =
-    bidderIdx ?? (challengerIdx === 0 ? hands.length - 1 : challengerIdx - 1);
+  const inferredBidder = bidderIdx ?? (challengerIdx === 0 ? hands.length - 1 : challengerIdx - 1);
   const loserIdx = actualMeetsBid ? challengerIdx : inferredBidder;
   return { actualCount, loserIdx, actualMeetsBid };
 }

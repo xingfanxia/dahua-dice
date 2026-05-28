@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from 'next';
-import { NextIntlClientProvider } from 'next-intl';
-import { getLocale, getMessages } from 'next-intl/server';
 import {
-  Noto_Serif_TC,
   Newsreader,
+  Noto_Serif_TC,
   Outfit,
   Plus_Jakarta_Sans,
   Space_Grotesk,
 } from 'next/font/google';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getMessages } from 'next-intl/server';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import './globals.css';
 
@@ -16,7 +16,11 @@ const spaceGrotesk = Space_Grotesk({
   variable: '--font-space-grotesk',
   display: 'swap',
 });
-const newsreader = Newsreader({ subsets: ['latin'], variable: '--font-newsreader', display: 'swap' });
+const newsreader = Newsreader({
+  subsets: ['latin'],
+  variable: '--font-newsreader',
+  display: 'swap',
+});
 const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit', display: 'swap' });
 const notoSerifTc = Noto_Serif_TC({
   weight: ['400', '700'],
@@ -32,7 +36,8 @@ const plusJakarta = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   title: '大话骰',
-  description: '2-8 player Liar\'s Dice with 3D physics, gyroscope shake-to-roll, and 4 switchable themes',
+  description:
+    "2-8 player Liar's Dice with 3D physics, gyroscope shake-to-roll, and 4 switchable themes",
   applicationName: '大话骰',
   manifest: '/manifest.json',
   icons: { icon: '/icon.svg', apple: '/icon.svg' },

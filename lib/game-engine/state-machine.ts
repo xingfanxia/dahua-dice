@@ -31,13 +31,26 @@ export function nextAliveIdx(players: Player[], from: number): number {
 export function applyTransition(state: RoomState, transition: Transition): RoomState {
   switch (transition.type) {
     case 'start_game':
-      return { ...state, phase: 'rolling', round: state.round + 1, currentTurnIdx: 0, lastBid: null, isZhaiRound: false, version: state.version + 1 };
+      return {
+        ...state,
+        phase: 'rolling',
+        round: state.round + 1,
+        currentTurnIdx: 0,
+        lastBid: null,
+        isZhaiRound: false,
+        version: state.version + 1,
+      };
     case 'all_rolled':
       return { ...state, phase: 'bidding', version: state.version + 1 };
     case 'next_bidder':
       return { ...state, currentTurnIdx: transition.nextIdx, version: state.version + 1 };
     case 'challenge':
-      return { ...state, phase: 'reveal', currentTurnIdx: transition.challengerIdx, version: state.version + 1 };
+      return {
+        ...state,
+        phase: 'reveal',
+        currentTurnIdx: transition.challengerIdx,
+        version: state.version + 1,
+      };
     case 'resolve': {
       const { loserIdx } = transition.result;
       const players = state.players.map((p, i) =>
@@ -50,7 +63,14 @@ export function applyTransition(state: RoomState, transition: Transition): RoomS
       return { ...state, players, phase, version: state.version + 1 };
     }
     case 'round_end_advance':
-      return { ...state, phase: 'rolling', round: state.round + 1, lastBid: null, isZhaiRound: false, version: state.version + 1 };
+      return {
+        ...state,
+        phase: 'rolling',
+        round: state.round + 1,
+        lastBid: null,
+        isZhaiRound: false,
+        version: state.version + 1,
+      };
     case 'game_over':
       return { ...state, phase: 'game_end', version: state.version + 1 };
     default:

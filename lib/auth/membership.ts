@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
-import { redis } from '@/lib/redis';
 import { readSession } from '@/lib/auth/session-store';
 import type { RoomState } from '@/lib/game-engine/types';
+import { redis } from '@/lib/redis';
 
 export type MembershipResult =
   | { ok: true; playerId: string; state: RoomState }

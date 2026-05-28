@@ -1,13 +1,7 @@
 export type Face = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type DiceFace = Face;
 
-export type Phase =
-  | 'lobby'
-  | 'rolling'
-  | 'bidding'
-  | 'reveal'
-  | 'round_end'
-  | 'game_end';
+export type Phase = 'lobby' | 'rolling' | 'bidding' | 'reveal' | 'round_end' | 'game_end';
 
 export type Bid = {
   count: number;

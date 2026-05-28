@@ -15,7 +15,9 @@ export type Session = {
 
 export type CreateSessionInput = { nick: string; theme: string };
 
-export async function createSession(input: CreateSessionInput): Promise<{ token: string; session: Session }> {
+export async function createSession(
+  input: CreateSessionInput,
+): Promise<{ token: string; session: Session }> {
   const token = generateToken();
   const session: Session = {
     playerId: generatePlayerId(),

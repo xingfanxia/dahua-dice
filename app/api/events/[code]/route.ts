@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { requireMembership } from '@/lib/auth/membership';
 import { redis } from '@/lib/redis';
 import { isValidInviteCode } from '@/lib/room/invite-code';
-import { requireMembership } from '@/lib/auth/membership';
 
 export const runtime = 'nodejs';
 

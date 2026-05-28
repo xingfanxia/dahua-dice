@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
+import { useMemo, useState } from 'react';
 import { useTheme } from '@/components/theme/ThemeProvider';
-import { getStartingBidThreshold, isValidBid } from '@/lib/game-engine/validate';
 import type { Bid, Face, GameRules, RoomState } from '@/lib/game-engine/types';
+import { getStartingBidThreshold, isValidBid } from '@/lib/game-engine/validate';
 
 const DICE_GLYPHS = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅', '7', '8'];
 
@@ -25,7 +25,9 @@ export function BidPanel({
   const { tokens } = useTheme();
   const rules: GameRules = state.rules;
 
-  const initialCount = state.lastBid ? state.lastBid.count + 1 : Math.ceil(rules.startingBidFactor * alivePlayers);
+  const initialCount = state.lastBid
+    ? state.lastBid.count + 1
+    : Math.ceil(rules.startingBidFactor * alivePlayers);
   const initialFace: Face = state.lastBid?.face ?? 4;
   const initialZhai = state.lastBid?.isZhai ?? false;
   const [count, setCount] = useState(initialCount);
@@ -55,7 +57,10 @@ export function BidPanel({
       )}
 
       <div className="flex items-center justify-between gap-4">
-        <span className="text-xs uppercase tracking-wide" style={{ color: tokens.colors.textMuted }}>
+        <span
+          className="text-xs uppercase tracking-wide"
+          style={{ color: tokens.colors.textMuted }}
+        >
           {t('game.count')}
         </span>
         <div className="flex items-center gap-3">
@@ -85,7 +90,10 @@ export function BidPanel({
       </div>
 
       <div className="flex flex-col gap-2">
-        <span className="text-xs uppercase tracking-wide" style={{ color: tokens.colors.textMuted }}>
+        <span
+          className="text-xs uppercase tracking-wide"
+          style={{ color: tokens.colors.textMuted }}
+        >
           {t('game.face')}
         </span>
         <div className="grid grid-cols-6 gap-2">
@@ -108,7 +116,10 @@ export function BidPanel({
       </div>
 
       {rules.allowZhai && (
-        <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: tokens.colors.text }}>
+        <label
+          className="flex items-center gap-2 text-sm cursor-pointer"
+          style={{ color: tokens.colors.text }}
+        >
           <input
             type="checkbox"
             checked={isZhai}

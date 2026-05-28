@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { resolveChallenge } from '@/lib/game-engine/resolve';
 import { applyTransition } from '@/lib/game-engine/state-machine';
-import { DEFAULT_RULES, type Bid, type RoomState } from '@/lib/game-engine/types';
+import { type Bid, DEFAULT_RULES, type RoomState } from '@/lib/game-engine/types';
 import { isValidBid } from '@/lib/game-engine/validate';
 
 function newGame(): RoomState {

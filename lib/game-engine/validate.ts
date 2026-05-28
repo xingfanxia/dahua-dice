@@ -17,7 +17,8 @@ export function isValidBid(
   alivePlayers: number,
 ): BidValidation {
   if (next.isZhai && !rules.allowZhai) return { ok: false, reason: 'zhai_disabled' };
-  if (!Number.isInteger(next.count) || next.count < 1) return { ok: false, reason: 'invalid_count' };
+  if (!Number.isInteger(next.count) || next.count < 1)
+    return { ok: false, reason: 'invalid_count' };
   if (!Number.isInteger(next.face) || next.face < 1 || next.face > rules.diceSides)
     return { ok: false, reason: 'invalid_face' };
 

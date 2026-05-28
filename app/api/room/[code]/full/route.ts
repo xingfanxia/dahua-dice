@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { isValidInviteCode } from '@/lib/room/invite-code';
 import { requireMembership } from '@/lib/auth/membership';
+import { isValidInviteCode } from '@/lib/room/invite-code';
 
 export const runtime = 'nodejs';
 

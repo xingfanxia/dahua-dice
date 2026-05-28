@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useState } from 'react';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { THEME_KEYS, type ThemeKey } from '@/components/theme/tokens';
 import { DEFAULT_RULES, type GameRules } from '@/lib/game-engine/types';
@@ -70,12 +70,18 @@ export function CustomizationDrawer({
         className="relative w-full max-w-md max-h-[85dvh] overflow-y-auto rounded-t-3xl p-6 flex flex-col gap-6"
         style={{ backgroundColor: tokens.colors.bg, color: tokens.colors.text }}
       >
-        <div className="w-12 h-1 rounded-full mx-auto" style={{ backgroundColor: tokens.colors.textMuted }} />
+        <div
+          className="w-12 h-1 rounded-full mx-auto"
+          style={{ backgroundColor: tokens.colors.textMuted }}
+        />
         <h2 className="text-2xl font-display">{t('customization.title')}</h2>
 
         {/* Theme switcher (always available) */}
         <section className="flex flex-col gap-2">
-          <h3 className="text-xs uppercase tracking-wide" style={{ color: tokens.colors.textMuted }}>
+          <h3
+            className="text-xs uppercase tracking-wide"
+            style={{ color: tokens.colors.textMuted }}
+          >
             {t('customization.themeSection')}
           </h3>
           <div className="grid grid-cols-2 gap-2">
@@ -86,7 +92,8 @@ export function CustomizationDrawer({
                 onClick={() => onSwitchTheme(key)}
                 className="py-3 rounded-xl text-sm transition-colors"
                 style={{
-                  backgroundColor: currentTheme === key ? tokens.colors.primary : tokens.colors.surface,
+                  backgroundColor:
+                    currentTheme === key ? tokens.colors.primary : tokens.colors.surface,
                   color: currentTheme === key ? tokens.colors.bg : tokens.colors.text,
                 }}
               >
@@ -125,11 +132,18 @@ export function CustomizationDrawer({
             </section>
 
             <section className="flex flex-col gap-3">
-              <h3 className="text-xs uppercase tracking-wide" style={{ color: tokens.colors.textMuted }}>
+              <h3
+                className="text-xs uppercase tracking-wide"
+                style={{ color: tokens.colors.textMuted }}
+              >
                 {t('customization.rules')}
               </h3>
               <Toggle label={t('customization.aceWild')} value={aceWild} onChange={setAceWild} />
-              <Toggle label={t('customization.allowZhai')} value={allowZhai} onChange={setAllowZhai} />
+              <Toggle
+                label={t('customization.allowZhai')}
+                value={allowZhai}
+                onChange={setAllowZhai}
+              />
               <Toggle
                 label={t('customization.pi')}
                 value={chineseExt.pi}
@@ -189,7 +203,7 @@ function Toggle({
         onClick={() => onChange(!value)}
         className="w-12 h-7 rounded-full relative transition-colors"
         style={{
-          backgroundColor: value ? tokens.colors.success : tokens.colors.textMuted + '55',
+          backgroundColor: value ? tokens.colors.success : `${tokens.colors.textMuted}55`,
         }}
       >
         <span

@@ -50,11 +50,13 @@ const recipes = {
   modern: {
     collide: () => ({
       inputs: [noise('white', 0.2, 0.6)],
-      filter: '[0]bandpass=f=2200:w=1500,afade=t=in:d=0.005,afade=t=out:d=0.18:st=0.02,volume=1.6[out]',
+      filter:
+        '[0]bandpass=f=2200:w=1500,afade=t=in:d=0.005,afade=t=out:d=0.18:st=0.02,volume=1.6[out]',
     }),
     shake: () => ({
       inputs: [noise('brown', 1.2, 0.45)],
-      filter: '[0]highpass=f=1500,tremolo=f=16:d=0.55,afade=t=in:d=0.02,afade=t=out:d=0.03:st=1.17,volume=1.1[out]',
+      filter:
+        '[0]highpass=f=1500,tremolo=f=16:d=0.55,afade=t=in:d=0.02,afade=t=out:d=0.03:st=1.17,volume=1.1[out]',
     }),
     reveal: () => ({
       inputs: [sine(523.25, 0.8), sine(783.99, 0.8)],
@@ -87,11 +89,13 @@ const recipes = {
   classic: {
     collide: () => ({
       inputs: [noise('pink', 0.2, 0.7)],
-      filter: '[0]bandpass=f=400:w=350,afade=t=in:d=0.005,afade=t=out:d=0.18:st=0.02,volume=1.8[out]',
+      filter:
+        '[0]bandpass=f=400:w=350,afade=t=in:d=0.005,afade=t=out:d=0.18:st=0.02,volume=1.8[out]',
     }),
     shake: () => ({
       inputs: [noise('pink', 1.2, 0.55)],
-      filter: '[0]bandpass=f=350:w=400,tremolo=f=12:d=0.6,afade=t=in:d=0.02,afade=t=out:d=0.03:st=1.17,volume=1.3[out]',
+      filter:
+        '[0]bandpass=f=350:w=400,tremolo=f=12:d=0.6,afade=t=in:d=0.02,afade=t=out:d=0.03:st=1.17,volume=1.3[out]',
     }),
     reveal: () => ({
       // Warm low chord C4 + G4
@@ -118,7 +122,8 @@ const recipes = {
     }),
     click: () => ({
       inputs: [noise('pink', 0.1, 0.6)],
-      filter: '[0]bandpass=f=1200:w=800,afade=t=in:d=0.002,afade=t=out:d=0.08:st=0.02,volume=1.2[out]',
+      filter:
+        '[0]bandpass=f=1200:w=800,afade=t=in:d=0.002,afade=t=out:d=0.08:st=0.02,volume=1.2[out]',
     }),
   },
 
@@ -126,11 +131,13 @@ const recipes = {
     collide: () => ({
       // Porcelain ring — band-passed pink noise + light echo
       inputs: [noise('pink', 0.2, 0.65)],
-      filter: '[0]bandpass=f=900:w=500,aecho=0.7:0.7:60:0.4,afade=t=in:d=0.005,afade=t=out:d=0.18:st=0.02,volume=1.6[out]',
+      filter:
+        '[0]bandpass=f=900:w=500,aecho=0.7:0.7:60:0.4,afade=t=in:d=0.005,afade=t=out:d=0.18:st=0.02,volume=1.6[out]',
     }),
     shake: () => ({
       inputs: [noise('white', 1.2, 0.5)],
-      filter: '[0]bandpass=f=600:w=400,tremolo=f=11:d=0.55,aecho=0.7:0.5:35:0.25,afade=t=in:d=0.02,afade=t=out:d=0.03:st=1.17,volume=1.2[out]',
+      filter:
+        '[0]bandpass=f=600:w=400,tremolo=f=11:d=0.55,aecho=0.7:0.5:35:0.25,afade=t=in:d=0.02,afade=t=out:d=0.03:st=1.17,volume=1.2[out]',
     }),
     reveal: () => ({
       // Pentatonic-ish open chord G4 + D5
@@ -157,7 +164,8 @@ const recipes = {
     }),
     click: () => ({
       inputs: [noise('white', 0.1, 0.5)],
-      filter: '[0]bandpass=f=1500:w=1000,afade=t=in:d=0.002,afade=t=out:d=0.08:st=0.02,volume=1.0[out]',
+      filter:
+        '[0]bandpass=f=1500:w=1000,afade=t=in:d=0.002,afade=t=out:d=0.08:st=0.02,volume=1.0[out]',
     }),
   },
 
@@ -172,7 +180,8 @@ const recipes = {
     }),
     shake: () => ({
       inputs: [noise('white', 1.2, 0.5)],
-      filter: '[0]bandpass=f=800:w=600,tremolo=f=20:d=0.7,afade=t=in:d=0.02,afade=t=out:d=0.03:st=1.17,volume=1.2[out]',
+      filter:
+        '[0]bandpass=f=800:w=600,tremolo=f=20:d=0.7,afade=t=in:d=0.02,afade=t=out:d=0.03:st=1.17,volume=1.2[out]',
     }),
     reveal: () => ({
       // Quick C5 → E5 → G5 sparkle (rest = silence)
@@ -222,11 +231,17 @@ function ffmpeg(args) {
 
 function ffprobeDuration(path) {
   const out = execFileSync('ffprobe', [
-    '-hide_banner', '-loglevel', 'error',
-    '-show_entries', 'stream=duration',
-    '-of', 'default=nw=1:nk=1',
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-show_entries',
+    'stream=duration',
+    '-of',
+    'default=nw=1:nk=1',
     path,
-  ]).toString().trim();
+  ])
+    .toString()
+    .trim();
   return parseFloat(out);
 }
 
@@ -234,14 +249,23 @@ function renderSegment(theme, segName, dur, wavPath) {
   const r = recipes[theme][segName]();
   const inputArgs = r.inputs.flatMap((src) => ['-f', 'lavfi', '-i', src]);
   ffmpeg([
-    '-hide_banner', '-loglevel', 'error', '-y',
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-y',
     ...inputArgs,
-    '-filter_complex', r.filter,
-    '-map', '[out]',
-    '-t', String(dur),
-    '-ar', String(SR),
-    '-ac', '1',
-    '-c:a', 'pcm_s16le',
+    '-filter_complex',
+    r.filter,
+    '-map',
+    '[out]',
+    '-t',
+    String(dur),
+    '-ar',
+    String(SR),
+    '-ac',
+    '1',
+    '-c:a',
+    'pcm_s16le',
     wavPath,
   ]);
   const got = ffprobeDuration(wavPath);
@@ -253,14 +277,21 @@ function renderSegment(theme, segName, dur, wavPath) {
 function concatAndEncode(theme, segWavs) {
   const masterWav = join(TMP, `${theme}.wav`);
   ffmpeg([
-    '-hide_banner', '-loglevel', 'error', '-y',
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-y',
     ...segWavs.flatMap((w) => ['-i', w]),
     '-filter_complex',
     `${segWavs.map((_, i) => `[${i}]`).join('')}concat=n=${segWavs.length}:v=0:a=1[out]`,
-    '-map', '[out]',
-    '-ar', String(SR),
-    '-ac', '1',
-    '-c:a', 'pcm_s16le',
+    '-map',
+    '[out]',
+    '-ar',
+    String(SR),
+    '-ac',
+    '1',
+    '-c:a',
+    'pcm_s16le',
     masterWav,
   ]);
   const got = ffprobeDuration(masterWav);
@@ -274,21 +305,35 @@ function concatAndEncode(theme, segWavs) {
   // MP3 — libmp3lame writes Xing/LAME info header by default; modern browsers
   // honor it for gapless sample-accurate decode. 96k mono ~= 50KB total.
   ffmpeg([
-    '-hide_banner', '-loglevel', 'error', '-y',
-    '-i', masterWav,
-    '-c:a', 'libmp3lame',
-    '-b:a', '96k',
-    '-write_xing', '1',
-    '-id3v2_version', '0',
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-y',
+    '-i',
+    masterWav,
+    '-c:a',
+    'libmp3lame',
+    '-b:a',
+    '96k',
+    '-write_xing',
+    '1',
+    '-id3v2_version',
+    '0',
     mp3Out,
   ]);
 
   // WebM Opus — gapless by design, ~40KB at 64k mono.
   ffmpeg([
-    '-hide_banner', '-loglevel', 'error', '-y',
-    '-i', masterWav,
-    '-c:a', 'libopus',
-    '-b:a', '64k',
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-y',
+    '-i',
+    masterWav,
+    '-c:a',
+    'libopus',
+    '-b:a',
+    '64k',
     webmOut,
   ]);
 
@@ -310,8 +355,8 @@ function main() {
     }
     const { mp3Size, webmSize } = concatAndEncode(theme, segWavs);
     process.stdout.write(
-      `[${theme}] -> public/audio/${theme}.mp3 (${(mp3Size / 1024).toFixed(1)} KB)`
-      + ` + ${theme}.webm (${(webmSize / 1024).toFixed(1)} KB)\n`
+      `[${theme}] -> public/audio/${theme}.mp3 (${(mp3Size / 1024).toFixed(1)} KB)` +
+        ` + ${theme}.webm (${(webmSize / 1024).toFixed(1)} KB)\n`,
     );
   }
 

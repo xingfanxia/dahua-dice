@@ -1,5 +1,5 @@
-import { getRequestConfig } from 'next-intl/server';
 import { cookies } from 'next/headers';
+import { getRequestConfig } from 'next-intl/server';
 
 export type Locale = 'zh-CN' | 'en';
 export const DEFAULT_LOCALE: Locale = 'zh-CN';

@@ -16,6 +16,7 @@ const NICK_MAX_LEN = 20;
 // Reject control chars (0x00-0x1F) and HTML-injection-prone chars (<>"'`&).
 // React JSX escaping makes XSS unlikely in display paths, but blocking these
 // at the API boundary keeps nicknames safe for any future attr/title/aria use.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: deliberately rejecting control chars
 const FORBIDDEN_RE = /[\x00-\x1F<>"'`&]/;
 
 export function validateNickname(input: unknown): NickValidation {

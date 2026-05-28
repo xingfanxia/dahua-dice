@@ -1,18 +1,14 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { redis } from '@/lib/redis';
-import { isValidInviteCode } from '@/lib/room/invite-code';
 import { readSession } from '@/lib/auth/session-store';
 import type { RoomState } from '@/lib/game-engine/types';
+import { redis } from '@/lib/redis';
+import { isValidInviteCode } from '@/lib/room/invite-code';
 import { RoomClient } from './RoomClient';
 
 export const dynamic = 'force-dynamic';
 
-export default async function RoomPage({
-  params,
-}: {
-  params: Promise<{ code: string }>;
-}) {
+export default async function RoomPage({ params }: { params: Promise<{ code: string }> }) {
   const { code: rawCode } = await params;
   const code = rawCode.toUpperCase();
   if (!isValidInviteCode(code)) redirect('/');

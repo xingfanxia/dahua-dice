@@ -42,7 +42,13 @@ vi.mock('@/lib/redis', () => ({
   UPSTASH_REST_TOKEN: '',
 }));
 
-import { createSession, readSession, SESSION_TTL, touchSession, updateSession } from '@/lib/auth/session-store';
+import {
+  createSession,
+  readSession,
+  SESSION_TTL,
+  touchSession,
+  updateSession,
+} from '@/lib/auth/session-store';
 
 beforeEach(() => {
   mockStore.clear();
