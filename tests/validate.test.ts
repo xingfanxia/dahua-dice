@@ -80,15 +80,37 @@ describe('isValidBid (zhai transitions)', () => {
     expect(isValidBid(prev, { count: 4, face: 4, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
   });
 
-  it('enters zhai (from non-zhai): must be > ceil(prev.count / 2)', () => {
+  it('enters zhai (from 飞): follows the normal raise rule (research §2.3 转斋)', () => {
     const prev = { count: 6, face: 4, isZhai: false } as const;
-    // ceil(6/2) = 3, so > 3 = at least 4
-    expect(isValidBid(prev, { count: 4, face: 4, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
-    expect(isValidBid(prev, { count: 3, face: 4, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(false);
+    // count-up into zhai → ok
+    expect(isValidBid(prev, { count: 7, face: 4, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
+    // same count + face-up into zhai → ok
+    expect(isValidBid(prev, { count: 6, face: 5, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
+    // same count + same face → not a raise → reject
+    expect(isValidBid(prev, { count: 6, face: 4, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(false);
+    // count-down into zhai → reject (no special halve-pool allowance)
+    expect(isValidBid(prev, { count: 4, face: 4, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(false);
   });
 
   it('rejects zhai when rules.allowZhai = false', () => {
     const rules: GameRules = { ...DEFAULT_RULES, allowZhai: false };
     expect(isValidBid(null, { count: 4, face: 4, isZhai: true }, rules, 4).ok).toBe(false);
+  });
+});
+
+describe('isValidBid (叫1必斋 — research §2.3)', () => {
+  it('rejects a non-zhai face-1 opener with the right reason', () => {
+    const r = isValidBid(null, { count: 4, face: 1, isZhai: false }, DEFAULT_RULES, 4);
+    expect(r.ok).toBe(false);
+    expect(r.ok ? undefined : r.reason).toBe('face_one_must_zhai');
+  });
+
+  it('accepts a zhai face-1 opener at the zhai threshold', () => {
+    expect(isValidBid(null, { count: 4, face: 1, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
+  });
+
+  it('rejects a non-zhai face-1 raise', () => {
+    const prev = { count: 3, face: 4, isZhai: false } as const;
+    expect(isValidBid(prev, { count: 4, face: 1, isZhai: false }, DEFAULT_RULES, 4).ok).toBe(false);
   });
 });

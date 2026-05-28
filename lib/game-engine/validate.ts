@@ -22,26 +22,26 @@ export function isValidBid(
   if (!Number.isInteger(next.face) || next.face < 1 || next.face > rules.diceSides)
     return { ok: false, reason: 'invalid_face' };
 
+  // 叫1必斋 (research §2.3): a face-1 bid is incoherent as a 飞 call — 1 is both
+  // the named face AND the wild — so bidding face 1 must enter the zhai state.
+  if (next.face === 1 && !next.isZhai) return { ok: false, reason: 'face_one_must_zhai' };
+
   if (!prev) {
     const threshold = getStartingBidThreshold(alivePlayers, next.isZhai, rules);
     if (next.count < threshold) return { ok: false, reason: 'below_starting' };
     return { ok: true };
   }
 
-  // Breaking out of zhai round (飞): non-zhai bid following a zhai bid must double the count
+  // Breaking out of a zhai round (飞): a non-zhai bid following a zhai bid must
+  // at least double the count (research §2.4 破斋: 飞叫的 X ≥ 斋叫的 X × 2).
   if (prev.isZhai && !next.isZhai) {
     if (next.count >= prev.count * 2) return { ok: true };
     return { ok: false, reason: 'break_zhai_needs_2x' };
   }
 
-  // Going into zhai from non-zhai (entering zhai round)
-  if (!prev.isZhai && next.isZhai) {
-    // Must be strictly more than half of prev.count (entering zhai cuts pool)
-    if (next.count > Math.ceil(prev.count / 2)) return { ok: true };
-    return { ok: false, reason: 'enter_zhai_too_low' };
-  }
-
-  // Same regime (both zhai or both non-zhai): count up, or same count + face up
+  // Every other transition — same regime, OR entering zhai from 飞 (research §2.3
+  // 中途转斋 only requires 满足加叫规则, i.e. the normal raise rule) — uses the
+  // standard raise: count up, or same count + face up.
   if (next.count > prev.count) return { ok: true };
   if (next.count === prev.count && next.face > prev.face) return { ok: true };
   return { ok: false, reason: 'not_higher' };

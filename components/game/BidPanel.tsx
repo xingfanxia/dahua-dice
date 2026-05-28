@@ -32,7 +32,9 @@ export function BidPanel({
   const initialZhai = state.lastBid?.isZhai ?? false;
   const [count, setCount] = useState(initialCount);
   const [face, setFace] = useState<Face>(initialFace);
-  const [isZhai, setIsZhai] = useState(initialZhai);
+  const [zhaiChecked, setZhaiChecked] = useState(initialZhai);
+  // 叫1必斋: naming face 1 forces zhai (1 is both the named face AND the wild).
+  const isZhai = face === 1 ? true : zhaiChecked;
 
   const candidate: Bid = useMemo(() => ({ count, face, isZhai }), [count, face, isZhai]);
   const validation = isValidBid(state.lastBid, candidate, rules, alivePlayers);
@@ -97,21 +99,25 @@ export function BidPanel({
           {t('game.face')}
         </span>
         <div className="grid grid-cols-6 gap-2">
-          {([1, 2, 3, 4, 5, 6] as Face[]).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFace(f)}
-              className="aspect-square rounded-xl text-2xl"
-              style={{
-                backgroundColor: face === f ? tokens.colors.primary : tokens.colors.bg,
-                color: face === f ? tokens.colors.bg : tokens.colors.text,
-                fontWeight: face === f ? 600 : 400,
-              }}
-            >
-              {DICE_GLYPHS[f - 1]}
-            </button>
-          ))}
+          {Array.from({ length: rules.diceSides }, (_, i) => (i + 1) as Face).map((f) => {
+            const disabled = f === 1 && !rules.allowZhai; // a face-1 bid requires zhai
+            return (
+              <button
+                key={f}
+                type="button"
+                disabled={disabled}
+                onClick={() => setFace(f)}
+                className="aspect-square rounded-xl text-2xl disabled:opacity-30"
+                style={{
+                  backgroundColor: face === f ? tokens.colors.primary : tokens.colors.bg,
+                  color: face === f ? tokens.colors.bg : tokens.colors.text,
+                  fontWeight: face === f ? 600 : 400,
+                }}
+              >
+                {DICE_GLYPHS[f - 1]}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -123,10 +129,14 @@ export function BidPanel({
           <input
             type="checkbox"
             checked={isZhai}
-            onChange={(e) => setIsZhai(e.target.checked)}
+            disabled={face === 1}
+            onChange={(e) => setZhaiChecked(e.target.checked)}
             className="w-4 h-4"
           />
           {t('game.zhaiCall')}
+          {face === 1 && (
+            <span style={{ color: tokens.colors.textMuted }}>· {t('game.faceOneAutoZhai')}</span>
+          )}
         </label>
       )}
 
@@ -172,8 +182,8 @@ export function BidPanel({
                 });
               case 'break_zhai_needs_2x':
                 return t('errors.breakZhaiNeeds2x');
-              case 'enter_zhai_too_low':
-                return t('errors.enterZhaiTooLow', { min: 1 });
+              case 'face_one_must_zhai':
+                return t('errors.faceOneMustZhai');
               case 'not_higher':
                 return t('errors.mustBeHigher');
               default:
