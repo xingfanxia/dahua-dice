@@ -504,6 +504,23 @@ function GameView({
 
   return (
     <section className="flex-1 flex flex-col gap-4">
+      {/* Screen-reader announcer for turn / phase / standing bid (spec §17C). */}
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {state.phase === 'bidding'
+          ? `${
+              isMyTurn
+                ? t('game.yourTurn')
+                : t('game.playerTurn', {
+                    name: state.players[state.currentTurnIdx]?.nick ?? '?',
+                  })
+            }${state.lastBid ? ` · ${state.lastBid.count} × ${state.lastBid.face}` : ''}`
+          : state.phase === 'reveal'
+            ? t('game.revealPhase')
+            : state.phase === 'game_end'
+              ? t('game.gameEnded')
+              : ''}
+      </p>
+
       <PlayerRing state={state} myPlayerId={myPlayerId} />
 
       {state.phase === 'bidding' && <BidChain state={state} />}
@@ -523,16 +540,19 @@ function GameView({
           onMouseLeave={() => setPeeking(false)}
           onTouchStart={() => setPeeking(true)}
           onTouchEnd={() => setPeeking(false)}
-          className="py-3 rounded-xl text-sm font-medium select-none"
+          className="py-3 min-h-[44px] rounded-xl text-sm font-medium select-none"
           style={{
             backgroundColor: tokens.colors.surface,
             color: tokens.colors.primary,
             border: `1px solid ${tokens.colors.primary}55`,
           }}
+          aria-label={`${t('game.peekHand')}: ${hand.join(', ')}`}
         >
-          {peeking
-            ? `🎲 ${hand.map((f) => ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][f - 1] || f).join(' · ')}`
-            : t('game.peekHand')}
+          <span aria-hidden="true">
+            {peeking
+              ? `🎲 ${hand.map((f) => ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][f - 1] || f).join(' · ')}`
+              : t('game.peekHand')}
+          </span>
         </button>
       )}
 

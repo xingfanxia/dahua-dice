@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import type { Bid, Face, GameRules, Player, RoomState } from '@/lib/game-engine/types';
 import { getStartingBidThreshold, isValidBid } from '@/lib/game-engine/validate';
@@ -67,6 +67,79 @@ export function BidPanel({
     totalDice,
     palifico,
   });
+  const [challengePending, setChallengePending] = useState(false);
+
+  // Keyboard play (spec §17C): 1-6 select face · +/- count · Enter bid (or confirm
+  // challenge) · Space arms the challenge confirm · Esc cancels. A ref carries the
+  // latest values so the document listener binds once.
+  const kb = useRef({
+    candidate,
+    validation,
+    challengePending,
+    busy,
+    countLocked,
+    hasLastBid: !!state.lastBid,
+    diceSides: rules.diceSides,
+    allowZhai: rules.allowZhai,
+    palifico,
+    onBid,
+    onChallenge,
+  });
+  kb.current = {
+    candidate,
+    validation,
+    challengePending,
+    busy,
+    countLocked,
+    hasLastBid: !!state.lastBid,
+    diceSides: rules.diceSides,
+    allowZhai: rules.allowZhai,
+    palifico,
+    onBid,
+    onChallenge,
+  };
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      const s = kb.current;
+      if (e.key >= '1' && e.key <= '8') {
+        const f = Number(e.key);
+        if (f <= s.diceSides && !(f === 1 && !s.allowZhai && !s.palifico)) setFace(f as Face);
+        return;
+      }
+      if (e.key === '+' || e.key === '=' || e.key === 'ArrowUp') {
+        if (!s.countLocked) setCount((c) => c + 1);
+        return;
+      }
+      if (e.key === '-' || e.key === 'ArrowDown') {
+        if (!s.countLocked) setCount((c) => Math.max(1, c - 1));
+        return;
+      }
+      if (e.key === 'Escape') {
+        setChallengePending(false);
+        setPiOpen(false);
+        return;
+      }
+      if (tag === 'BUTTON') return; // let Space/Enter activate a focused button natively
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (s.challengePending) {
+          setChallengePending(false);
+          s.onChallenge();
+        } else if (s.validation.ok && !s.busy) {
+          s.onBid(s.candidate);
+        }
+        return;
+      }
+      if (e.key === ' ' && s.hasLastBid) {
+        e.preventDefault();
+        setChallengePending((p) => !p);
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <section
@@ -198,14 +271,49 @@ export function BidPanel({
           <button
             type="button"
             disabled={busy}
-            onClick={onChallenge}
+            onClick={() => setChallengePending(true)}
             className="flex-1 py-4 rounded-2xl font-medium disabled:opacity-40 transition-opacity"
             style={{ backgroundColor: tokens.colors.danger, color: tokens.colors.bg }}
+            aria-haspopup="true"
           >
             {t('game.challenge')}
           </button>
         )}
       </div>
+
+      {/* Challenge confirm — fat-finger / Space guard before the irreversible 开. */}
+      {challengePending && state.lastBid && (
+        <div
+          className="flex items-center gap-2 rounded-2xl p-3"
+          style={{ backgroundColor: `${tokens.colors.danger}1a` }}
+          role="alertdialog"
+          aria-label={t('game.challengeConfirm')}
+        >
+          <span className="text-sm flex-1" style={{ color: tokens.colors.danger }}>
+            {t('game.challengeConfirm')}
+          </span>
+          <button
+            type="button"
+            onClick={() => setChallengePending(false)}
+            className="px-4 min-h-[44px] rounded-xl text-sm"
+            style={{ color: tokens.colors.textMuted }}
+          >
+            {t('common.cancel')}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setChallengePending(false);
+              onChallenge();
+            }}
+            className="px-4 min-h-[44px] rounded-xl text-sm font-medium disabled:opacity-40"
+            style={{ backgroundColor: tokens.colors.danger, color: tokens.colors.bg }}
+          >
+            {t('game.challengeConfirmBtn')}
+          </button>
+        </div>
+      )}
 
       {/* 中式扩展 actions */}
       {(piTargets.length > 0 || canTongsha) && (

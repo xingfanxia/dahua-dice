@@ -95,7 +95,9 @@
     "kindTongsha": "Sweep!",
     "lostDie": "lost a die",
     "lostNDice": "lost {n} dice",
-    "eliminated": "eliminated"
+    "eliminated": "eliminated",
+    "challengeConfirm": "Open the cups?",
+    "challengeConfirmBtn": "Confirm"
   },
   "errors": {
     "network": "Network error",

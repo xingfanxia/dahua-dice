@@ -56,7 +56,8 @@ export function BidChain({ state }: { state: RoomState }) {
               <span className="text-sm" style={{ color: tokens.colors.textMuted }}>
                 {player?.nick ?? '?'}
               </span>
-              <span className="ml-auto flex items-center gap-1.5" aria-label={srLabel}>
+              <span className="ml-auto flex items-center gap-1.5">
+                <span className="sr-only">{srLabel}</span>
                 <span className="num text-base" style={{ color: tokens.colors.text }} aria-hidden>
                   {entry.bid.count}
                 </span>

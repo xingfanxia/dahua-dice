@@ -80,13 +80,21 @@ export function RevealStage({
                 {p.nick}
                 {isMe && <span style={{ color: tokens.colors.textMuted }}> {t('game.you')}</span>}
                 {!p.alive && (
-                  <span style={{ color: tokens.colors.danger }} aria-label={t('game.eliminated')}>
+                  <span
+                    role="img"
+                    aria-label={t('game.eliminated')}
+                    style={{ color: tokens.colors.danger }}
+                  >
                     {' '}
                     💀
                   </span>
                 )}
               </span>
-              <div className="flex gap-1 text-2xl" aria-label={`${p.nick}: ${hand.join(', ')}`}>
+              <div
+                className="flex gap-1 text-2xl"
+                role="img"
+                aria-label={`${p.nick}: ${hand.join(', ')}`}
+              >
                 {hand.map((face, j) => {
                   const counted = face === verified.face || (face === 1 && wildCount);
                   return (

@@ -95,7 +95,9 @@
     "kindTongsha": "通杀!",
     "lostDie": "输一颗骰",
     "lostNDice": "输 {n} 颗骰",
-    "eliminated": "已出局"
+    "eliminated": "已出局",
+    "challengeConfirm": "确定开牌？",
+    "challengeConfirmBtn": "确认开!"
   },
   "errors": {
     "network": "网络错误",

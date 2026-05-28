@@ -1,10 +1,16 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { THEME_KEYS, type ThemeKey } from '@/components/theme/tokens';
 import type { GameRules } from '@/lib/game-engine/types';
+
+const FOCUSABLE =
+  'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+function focusablesOf(el: HTMLElement | null): HTMLElement[] {
+  return el ? Array.from(el.querySelectorAll<HTMLElement>(FOCUSABLE)) : [];
+}
 
 export function CustomizationDrawer({
   open,
@@ -30,6 +36,17 @@ export function CustomizationDrawer({
   const [allowZhai, setAllowZhai] = useState(rules.allowZhai);
   const [chineseExt, setChineseExt] = useState(rules.chineseExtensions);
   const [palifico, setPalifico] = useState(rules.paliFicoVariant);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const restoreRef = useRef<HTMLElement | null>(null);
+
+  // Focus management for the modal drawer (spec §17C): move focus in on open,
+  // restore to the trigger on close. Tab-trapping is handled in onKeyDown below.
+  useEffect(() => {
+    if (!open) return;
+    restoreRef.current = document.activeElement as HTMLElement | null;
+    focusablesOf(panelRef.current)[0]?.focus();
+    return () => restoreRef.current?.focus?.();
+  }, [open]);
 
   if (!open) return null;
 
@@ -54,7 +71,22 @@ export function CustomizationDrawer({
       aria-modal="true"
       aria-label={t('customization.title')}
       onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose();
+        if (e.key === 'Escape') {
+          onClose();
+          return;
+        }
+        if (e.key !== 'Tab') return;
+        const f = focusablesOf(panelRef.current);
+        if (f.length === 0) return;
+        const first = f[0];
+        const last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }}
     >
       {/* Backdrop — click outside panel dismisses; Esc handler on parent for keyboard. */}
@@ -68,6 +100,7 @@ export function CustomizationDrawer({
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopping propagation, not handling interaction */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: container for dialog content */}
       <div
+        ref={panelRef}
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-md max-h-[85dvh] overflow-y-auto rounded-t-3xl p-6 flex flex-col gap-6"
         style={{ backgroundColor: tokens.colors.bg, color: tokens.colors.text }}
