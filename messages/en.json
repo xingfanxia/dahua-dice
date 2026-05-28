@@ -97,7 +97,8 @@
     "lostNDice": "lost {n} dice",
     "eliminated": "eliminated",
     "challengeConfirm": "Open the cups?",
-    "challengeConfirmBtn": "Confirm"
+    "challengeConfirmBtn": "Confirm",
+    "diceLeftLabel": "{n} dice left"
   },
   "errors": {
     "network": "Network error",

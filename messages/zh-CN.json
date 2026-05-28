@@ -97,7 +97,8 @@
     "lostNDice": "输 {n} 颗骰",
     "eliminated": "已出局",
     "challengeConfirm": "确定开牌？",
-    "challengeConfirmBtn": "确认开!"
+    "challengeConfirmBtn": "确认开!",
+    "diceLeftLabel": "剩 {n} 颗骰"
   },
   "errors": {
     "network": "网络错误",

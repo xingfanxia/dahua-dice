@@ -17,6 +17,7 @@ export function PlayerRing({ state, myPlayerId }: { state: RoomState; myPlayerId
         return (
           <div
             key={p.id}
+            aria-current={isCurrent ? 'true' : undefined}
             className="flex flex-col items-center gap-1 rounded-xl px-2 py-1.5 transition-transform"
             style={{
               backgroundColor: isCurrent ? `${tokens.colors.primary}22` : tokens.colors.surface,
@@ -43,13 +44,19 @@ export function PlayerRing({ state, myPlayerId }: { state: RoomState; myPlayerId
 }
 
 function PlayerStatus({ player }: { player: Player }) {
+  const t = useTranslations();
   const { tokens } = useTheme();
   return (
     <div className="flex items-center gap-1">
       <span className="text-xs num" style={{ color: tokens.colors.textMuted }}>
-        🎲 {player.diceLeft}
+        <span aria-hidden="true">🎲 {player.diceLeft}</span>
+        <span className="sr-only">{t('game.diceLeftLabel', { n: player.diceLeft })}</span>
       </span>
-      {!player.alive && <span className="text-xs">💀</span>}
+      {!player.alive && (
+        <span className="text-xs" role="img" aria-label={t('game.eliminated')}>
+          💀
+        </span>
+      )}
     </div>
   );
 }
