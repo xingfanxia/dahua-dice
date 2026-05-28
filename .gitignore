@@ -14,3 +14,6 @@ coverage/
 .vscode/
 !.vscode/settings.json
 .vercel
+test-results/
+playwright-report/
+.playwright/
