@@ -3,41 +3,67 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { validateNickname } from '@/lib/auth/session';
 import { readSession, updateSession } from '@/lib/auth/session-store';
 import { normalizeAvatar } from '@/lib/avatars';
-import type { Face, GameRules, RoomState } from '@/lib/game-engine/types';
+import type { Face, RoomState } from '@/lib/game-engine/types';
 import { isValidBid } from '@/lib/game-engine/validate';
 import { runScript } from '@/lib/lua/run';
+import { rateLimit } from '@/lib/rate-limit';
 import { redis } from '@/lib/redis';
 import { rollDice } from '@/lib/room/dice-rng';
 import { isValidInviteCode } from '@/lib/room/invite-code';
+import { actionSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 
-type Action =
-  | { type: 'join'; code: string; nick: string; avatar?: string }
-  | { type: 'start'; code: string }
-  | {
-      type: 'bid';
-      code: string;
-      count: number;
-      face: Face;
-      isZhai: boolean;
-      expectedVersion: number;
-    }
-  | { type: 'challenge'; code: string; expectedVersion: number }
-  | { type: 'nextRound'; code: string; expectedVersion: number }
-  | { type: 'leave'; code: string }
-  | { type: 'setAvatar'; code: string; avatar: string }
-  | { type: 'updateRules'; code: string; rules: GameRules };
+/** Spec §17: 30 actions / minute per session. */
+const ACTION_LIMIT = 30;
+const ACTION_WINDOW_SEC = 60;
+
+/** Map a Lua failure reason to the right HTTP status (client keys on `reason`; this is for correct semantics/observability). */
+function statusForReason(reason: string | undefined): number {
+  switch (reason) {
+    case 'no_room':
+      return 404;
+    case 'room_full':
+    case 'not_owner':
+    case 'not_in_room':
+    case 'not_alive':
+    case 'not_your_turn':
+      return 403;
+    case 'stale':
+      return 409;
+    default:
+      return 400;
+  }
+}
 
 export async function POST(req: NextRequest) {
-  const body = (await req.json()) as Action;
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch {
+    return NextResponse.json({ ok: false, reason: 'invalid_json' }, { status: 400 });
+  }
+  const parsed = actionSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ ok: false, reason: 'invalid_request' }, { status: 400 });
+  }
+  const body = parsed.data;
+
   const cookieStore = await cookies();
   const token = cookieStore.get('dahua_token')?.value;
   if (!token) return NextResponse.json({ ok: false, reason: 'no_session' }, { status: 401 });
   const session = await readSession(token);
   if (!session) return NextResponse.json({ ok: false, reason: 'session_expired' }, { status: 401 });
 
-  if (!body?.code || !isValidInviteCode(body.code.toUpperCase())) {
+  const limited = await rateLimit(`action:${token}`, ACTION_LIMIT, ACTION_WINDOW_SEC);
+  if (!limited.ok) {
+    return NextResponse.json(
+      { ok: false, reason: 'rate_limited', retryAfter: limited.retryAfter },
+      { status: 429 },
+    );
+  }
+
+  if (!isValidInviteCode(body.code.toUpperCase())) {
     return NextResponse.json({ ok: false, reason: 'invalid_code' }, { status: 400 });
   }
   const code = body.code.toUpperCase();
@@ -48,14 +74,17 @@ export async function POST(req: NextRequest) {
     case 'join': {
       const v = validateNickname(body.nick);
       if (!v.ok) return NextResponse.json({ ok: false, reason: v.reason }, { status: 400 });
-      await updateSession(token, { nick: v.value, currentRoom: code });
       const result = await runScript(
         'joinRoom',
         [stateKey],
         [session.playerId, v.value, normalizeAvatar(body.avatar)],
       );
-      const status = !result.ok && result.reason === 'room_full' ? 403 : 200;
-      return NextResponse.json(result, { status: result.ok ? 200 : status });
+      // Only pin the session to this room AFTER the join is confirmed, so a 404
+      // / full / in-progress room never leaves the session pointing at it.
+      if (result.ok) await updateSession(token, { nick: v.value, currentRoom: code });
+      return NextResponse.json(result, {
+        status: result.ok ? 200 : statusForReason(result.reason),
+      });
     }
 
     case 'start': {
@@ -76,7 +105,9 @@ export async function POST(req: NextRequest) {
         [stateKey, handsKey],
         [session.playerId, ...handArgs],
       );
-      return NextResponse.json(result);
+      return NextResponse.json(result, {
+        status: result.ok ? 200 : statusForReason(result.reason),
+      });
     }
 
     case 'bid': {
@@ -85,7 +116,7 @@ export async function POST(req: NextRequest) {
       const alive = state.players.filter((p) => p.alive).length;
       const validation = isValidBid(
         state.lastBid,
-        { count: body.count, face: body.face, isZhai: body.isZhai },
+        { count: body.count, face: body.face as Face, isZhai: body.isZhai },
         state.rules,
         alive,
       );
@@ -103,7 +134,9 @@ export async function POST(req: NextRequest) {
           String(body.expectedVersion),
         ],
       );
-      return NextResponse.json(result);
+      return NextResponse.json(result, {
+        status: result.ok ? 200 : statusForReason(result.reason),
+      });
     }
 
     case 'challenge': {
@@ -112,7 +145,9 @@ export async function POST(req: NextRequest) {
         [stateKey, handsKey],
         [session.playerId, String(body.expectedVersion)],
       );
-      return NextResponse.json(result);
+      return NextResponse.json(result, {
+        status: result.ok ? 200 : statusForReason(result.reason),
+      });
     }
 
     case 'nextRound': {
@@ -129,14 +164,18 @@ export async function POST(req: NextRequest) {
         [stateKey, handsKey],
         [session.playerId, String(body.expectedVersion), ...handArgs],
       );
-      return NextResponse.json(result);
+      return NextResponse.json(result, {
+        status: result.ok ? 200 : statusForReason(result.reason),
+      });
     }
 
     case 'leave': {
       const result = await runScript('leaveRoom', [stateKey], [session.playerId]);
       // Clear currentRoom on session even if removal failed (best-effort)
       await updateSession(token, { currentRoom: null });
-      return NextResponse.json(result);
+      return NextResponse.json(result, {
+        status: result.ok ? 200 : statusForReason(result.reason),
+      });
     }
 
     case 'setAvatar': {
@@ -145,7 +184,9 @@ export async function POST(req: NextRequest) {
         [stateKey],
         [session.playerId, normalizeAvatar(body.avatar)],
       );
-      return NextResponse.json(result, { status: result.ok ? 200 : 400 });
+      return NextResponse.json(result, {
+        status: result.ok ? 200 : statusForReason(result.reason),
+      });
     }
 
     case 'updateRules': {
@@ -157,6 +198,8 @@ export async function POST(req: NextRequest) {
       if (state.phase !== 'lobby') {
         return NextResponse.json({ ok: false, reason: 'wrong_phase' }, { status: 400 });
       }
+      // body.rules is schema-validated (diceCount 3-7, diceSides 6|8, factor 1-3,
+      // unknown keys stripped) — safe to persist verbatim.
       const updated: RoomState = {
         ...state,
         rules: body.rules,

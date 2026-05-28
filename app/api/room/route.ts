@@ -3,14 +3,31 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { validateNickname } from '@/lib/auth/session';
 import { createSession, updateSession } from '@/lib/auth/session-store';
 import { DEFAULT_RULES, type RoomState } from '@/lib/game-engine/types';
+import { clientIp, rateLimit } from '@/lib/rate-limit';
 import { redis } from '@/lib/redis';
 import { generateInviteCode } from '@/lib/room/invite-code';
 
 export const runtime = 'nodejs';
 
 const LOBBY_TTL = 1800; // 30 minutes
+// Room creation is unauthenticated and writes a fresh room key each time —
+// throttle per-IP to prevent room-spam / Redis-fill.
+const ROOM_CREATE_LIMIT = 15;
+const ROOM_CREATE_WINDOW_SEC = 60;
 
 export async function POST(req: NextRequest) {
+  const limited = await rateLimit(
+    `room:${clientIp(req)}`,
+    ROOM_CREATE_LIMIT,
+    ROOM_CREATE_WINDOW_SEC,
+  );
+  if (!limited.ok) {
+    return NextResponse.json(
+      { ok: false, reason: 'rate_limited', retryAfter: limited.retryAfter },
+      { status: 429 },
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();
