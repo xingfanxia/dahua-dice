@@ -36,10 +36,14 @@ test.describe('happy path', () => {
     await expect(aliceBid).toBeVisible({ timeout: 15000 });
     await aliceBid.click();
 
-    // Bob now has the turn and can challenge ("开").
+    // Bob now has the turn and can challenge ("开"). Challenge requires a confirm
+    // step (fat-finger guard) before it fires.
     const bobChallenge = bob.getByRole('button', { name: '开', exact: true });
     await expect(bobChallenge).toBeVisible({ timeout: 15000 });
     await bobChallenge.click();
+    const bobConfirm = bob.getByRole('button', { name: '确认开!' });
+    await expect(bobConfirm).toBeVisible();
+    await bobConfirm.click();
 
     // Reveal stage appears for both players.
     await expect(alice.getByText(STR.reveal)).toBeVisible({ timeout: 15000 });
