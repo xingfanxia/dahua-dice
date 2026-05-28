@@ -82,7 +82,20 @@
     "loserLostDie": "💀 {name} lost a die",
     "you": "(you)",
     "gameEnded": "Game over",
-    "champion": "🏆 {name}"
+    "champion": "🏆 {name}",
+    "bidChainHeader": "Bid chain",
+    "countUp": "Increase",
+    "countDown": "Decrease",
+    "pi": "Split (劈)",
+    "tongsha": "Sweep (通杀)",
+    "piPickTarget": "Split whom? (skip predecessor)",
+    "palificoBanner": "Palifico round · 1s not wild · count locked · face-only raises",
+    "kindChallenge": "Challenge",
+    "kindPi": "Split!",
+    "kindTongsha": "Sweep!",
+    "lostDie": "lost a die",
+    "lostNDice": "lost {n} dice",
+    "eliminated": "eliminated"
   },
   "errors": {
     "network": "Network error",
@@ -102,7 +115,9 @@
     "belowStarting": "First bid needs ≥ {min}",
     "invalidCount": "Count must be a positive integer",
     "notYourTurn": "Not your turn",
-    "stale": "State changed, syncing"
+    "stale": "State changed, syncing",
+    "countExceedsDice": "Count can't exceed the dice on the table",
+    "palificoCountLocked": "Palifico locks the count — raise the face only"
   },
   "customization": {
     "title": "Rules",

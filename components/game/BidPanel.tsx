@@ -3,8 +3,9 @@
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { useTheme } from '@/components/theme/ThemeProvider';
-import type { Bid, Face, GameRules, RoomState } from '@/lib/game-engine/types';
+import type { Bid, Face, GameRules, Player, RoomState } from '@/lib/game-engine/types';
 import { getStartingBidThreshold, isValidBid } from '@/lib/game-engine/validate';
+import { AvatarBadge } from './AvatarBadge';
 
 const DICE_GLYPHS = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅', '7', '8'];
 
@@ -13,37 +14,74 @@ export function BidPanel({
   alivePlayers,
   onBid,
   onChallenge,
+  onPi,
+  onTongsha,
   busy,
 }: {
   state: RoomState;
   alivePlayers: number;
   onBid: (bid: Bid) => void;
   onChallenge: () => void;
+  onPi: (targetId: string) => void;
+  onTongsha: () => void;
   busy: boolean;
 }) {
   const t = useTranslations();
   const { tokens } = useTheme();
   const rules: GameRules = state.rules;
+  const palifico = state.palificoActive ?? false;
+  const chain = state.bidChain ?? [];
+  const meId = state.players[state.currentTurnIdx]?.id ?? null;
+  const standingOwner = chain.length ? chain[chain.length - 1].playerId : null;
 
-  const initialCount = state.lastBid
-    ? state.lastBid.count + 1
-    : Math.ceil(rules.startingBidFactor * alivePlayers);
+  // 劈 can target any alive chain bidder who is NOT the immediate predecessor or self.
+  const piTargets: Player[] =
+    rules.chineseExtensions.pi && state.lastBid
+      ? [...new Set(chain.map((e) => e.playerId))]
+          .filter((id) => id !== standingOwner && id !== meId)
+          .map((id) => state.players.find((p) => p.id === id))
+          .filter((p): p is Player => !!p && p.alive)
+      : [];
+  const canTongsha =
+    rules.chineseExtensions.tongsha &&
+    !!state.lastBid &&
+    [...new Set(chain.map((e) => e.playerId))].some((id) => id !== meId);
+
+  const initialCount = palifico
+    ? (state.lastBid?.count ?? alivePlayers)
+    : state.lastBid
+      ? state.lastBid.count + 1
+      : Math.ceil(rules.startingBidFactor * alivePlayers);
   const initialFace: Face = state.lastBid?.face ?? 4;
-  const initialZhai = state.lastBid?.isZhai ?? false;
   const [count, setCount] = useState(initialCount);
   const [face, setFace] = useState<Face>(initialFace);
-  const [zhaiChecked, setZhaiChecked] = useState(initialZhai);
-  // 叫1必斋: naming face 1 forces zhai (1 is both the named face AND the wild).
-  const isZhai = face === 1 ? true : zhaiChecked;
+  const [zhaiChecked, setZhaiChecked] = useState(state.lastBid?.isZhai ?? false);
+  const [piOpen, setPiOpen] = useState(false);
+  // 叫1必斋: face 1 forces zhai (non-Palifico). In Palifico, 1s are simply not wild.
+  const isZhai = palifico ? false : face === 1 ? true : zhaiChecked;
+  const countLocked = palifico && !!state.lastBid; // Palifico locks the count to the opener's
 
   const candidate: Bid = useMemo(() => ({ count, face, isZhai }), [count, face, isZhai]);
-  const validation = isValidBid(state.lastBid, candidate, rules, alivePlayers);
+  const totalDice = state.players.reduce((s, p) => s + (p.alive ? p.diceLeft : 0), 0);
+  const validation = isValidBid(state.lastBid, candidate, rules, alivePlayers, {
+    totalDice,
+    palifico,
+  });
 
   return (
     <section
       className="rounded-3xl p-4 flex flex-col gap-4"
       style={{ backgroundColor: tokens.colors.surface }}
     >
+      {palifico && (
+        <p
+          className="text-xs text-center px-3 py-2 rounded-xl"
+          style={{ backgroundColor: `${tokens.colors.accent}22`, color: tokens.colors.accent }}
+        >
+          {t('game.palificoBanner')}
+        </p>
+      )}
+
       {state.lastBid && (
         <p className="text-sm" style={{ color: tokens.colors.textMuted }}>
           {t('game.callDescription', {
@@ -68,9 +106,11 @@ export function BidPanel({
         <div className="flex items-center gap-3">
           <button
             type="button"
+            disabled={countLocked}
             onClick={() => setCount((c) => Math.max(1, c - 1))}
-            className="w-10 h-10 rounded-full text-xl font-medium"
+            className="w-11 h-11 rounded-full text-xl font-medium disabled:opacity-30"
             style={{ backgroundColor: tokens.colors.bg, color: tokens.colors.text }}
+            aria-label={t('game.countDown')}
           >
             −
           </button>
@@ -82,9 +122,11 @@ export function BidPanel({
           </span>
           <button
             type="button"
+            disabled={countLocked}
             onClick={() => setCount((c) => c + 1)}
-            className="w-10 h-10 rounded-full text-xl font-medium"
+            className="w-11 h-11 rounded-full text-xl font-medium disabled:opacity-30"
             style={{ backgroundColor: tokens.colors.bg, color: tokens.colors.text }}
+            aria-label={t('game.countUp')}
           >
             +
           </button>
@@ -100,19 +142,21 @@ export function BidPanel({
         </span>
         <div className="grid grid-cols-6 gap-2">
           {Array.from({ length: rules.diceSides }, (_, i) => (i + 1) as Face).map((f) => {
-            const disabled = f === 1 && !rules.allowZhai; // a face-1 bid requires zhai
+            const disabled = f === 1 && !rules.allowZhai && !palifico;
             return (
               <button
                 key={f}
                 type="button"
                 disabled={disabled}
                 onClick={() => setFace(f)}
-                className="aspect-square rounded-xl text-2xl disabled:opacity-30"
+                className="aspect-square min-h-[44px] rounded-xl text-2xl disabled:opacity-30"
                 style={{
                   backgroundColor: face === f ? tokens.colors.primary : tokens.colors.bg,
                   color: face === f ? tokens.colors.bg : tokens.colors.text,
                   fontWeight: face === f ? 600 : 400,
                 }}
+                aria-pressed={face === f}
+                aria-label={`${f}`}
               >
                 {DICE_GLYPHS[f - 1]}
               </button>
@@ -121,7 +165,7 @@ export function BidPanel({
         </div>
       </div>
 
-      {rules.allowZhai && (
+      {rules.allowZhai && !palifico && (
         <label
           className="flex items-center gap-2 text-sm cursor-pointer"
           style={{ color: tokens.colors.text }}
@@ -146,10 +190,7 @@ export function BidPanel({
           disabled={busy || !validation.ok}
           onClick={() => onBid(candidate)}
           className="flex-1 py-4 rounded-2xl font-medium disabled:opacity-40 transition-opacity"
-          style={{
-            backgroundColor: tokens.colors.success,
-            color: tokens.colors.bg,
-          }}
+          style={{ backgroundColor: tokens.colors.success, color: tokens.colors.bg }}
         >
           {t('game.submitBid', { count, face: DICE_GLYPHS[face - 1] })}
         </button>
@@ -166,8 +207,71 @@ export function BidPanel({
         )}
       </div>
 
+      {/* 中式扩展 actions */}
+      {(piTargets.length > 0 || canTongsha) && (
+        <div className="flex gap-3">
+          {piTargets.length > 0 && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setPiOpen((o) => !o)}
+              className="flex-1 py-3 rounded-2xl text-sm font-medium disabled:opacity-40"
+              style={{
+                backgroundColor: tokens.colors.bg,
+                color: tokens.colors.accent,
+                border: `1px solid ${tokens.colors.accent}66`,
+              }}
+              aria-expanded={piOpen}
+            >
+              {t('game.pi')}
+            </button>
+          )}
+          {canTongsha && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onTongsha}
+              className="flex-1 py-3 rounded-2xl text-sm font-medium disabled:opacity-40"
+              style={{
+                backgroundColor: tokens.colors.bg,
+                color: tokens.colors.danger,
+                border: `1px solid ${tokens.colors.danger}66`,
+              }}
+            >
+              {t('game.tongsha')}
+            </button>
+          )}
+        </div>
+      )}
+
+      {piOpen && piTargets.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs" style={{ color: tokens.colors.textMuted }}>
+            {t('game.piPickTarget')}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {piTargets.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setPiOpen(false);
+                  onPi(p.id);
+                }}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl disabled:opacity-40"
+                style={{ backgroundColor: tokens.colors.bg, color: tokens.colors.text }}
+              >
+                <AvatarBadge avatar={p.avatar} seed={p.id} seat={1} size={22} />
+                {p.nick}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {!validation.ok && (
-        <p className="text-xs text-center" style={{ color: tokens.colors.danger }}>
+        <p className="text-xs text-center" style={{ color: tokens.colors.danger }} role="alert">
           {(() => {
             switch (validation.reason) {
               case 'zhai_disabled':
@@ -176,14 +280,18 @@ export function BidPanel({
                 return t('errors.invalidCount');
               case 'invalid_face':
                 return t('errors.invalidFace');
+              case 'count_exceeds_dice':
+                return t('errors.countExceedsDice');
               case 'below_starting':
                 return t('errors.belowStarting', {
-                  min: getStartingBidThreshold(alivePlayers, false, rules),
+                  min: getStartingBidThreshold(alivePlayers, isZhai, rules),
                 });
               case 'break_zhai_needs_2x':
                 return t('errors.breakZhaiNeeds2x');
               case 'face_one_must_zhai':
                 return t('errors.faceOneMustZhai');
+              case 'palifico_count_locked':
+                return t('errors.palificoCountLocked');
               case 'not_higher':
                 return t('errors.mustBeHigher');
               default:

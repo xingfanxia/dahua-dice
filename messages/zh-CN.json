@@ -82,7 +82,20 @@
     "loserLostDie": "💀 {name} 输一颗骰",
     "you": "(你)",
     "gameEnded": "游戏结束",
-    "champion": "🏆 {name}"
+    "champion": "🏆 {name}",
+    "bidChainHeader": "叫数链",
+    "countUp": "加一",
+    "countDown": "减一",
+    "pi": "劈",
+    "tongsha": "通杀",
+    "piPickTarget": "劈谁？（跳过上家）",
+    "palificoBanner": "Palifico 回合 · 1 点不算 · 数量锁定 · 只能加点数",
+    "kindChallenge": "开",
+    "kindPi": "劈!",
+    "kindTongsha": "通杀!",
+    "lostDie": "输一颗骰",
+    "lostNDice": "输 {n} 颗骰",
+    "eliminated": "已出局"
   },
   "errors": {
     "network": "网络错误",
@@ -102,7 +115,9 @@
     "belowStarting": "首叫至少 {min} 个",
     "invalidCount": "数量必须为正整数",
     "notYourTurn": "现在不是你的回合",
-    "stale": "状态已变，正在同步"
+    "stale": "状态已变，正在同步",
+    "countExceedsDice": "数量不能超过场上骰子总数",
+    "palificoCountLocked": "Palifico 回合数量锁定，只能加点数"
   },
   "customization": {
     "title": "规则设定",

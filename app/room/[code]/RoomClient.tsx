@@ -459,6 +459,32 @@ function GameView({
     }
   }
 
+  async function submitPi(targetPlayerId: string) {
+    setBusy(true);
+    try {
+      await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'pi', code, targetPlayerId, expectedVersion: state.version }),
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitTongsha() {
+    setBusy(true);
+    try {
+      await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'tongsha', code, expectedVersion: state.version }),
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submitNextRound() {
     setBusy(true);
     try {
@@ -516,6 +542,8 @@ function GameView({
           alivePlayers={alivePlayers}
           onBid={submitBid}
           onChallenge={submitChallenge}
+          onPi={submitPi}
+          onTongsha={submitTongsha}
           busy={busy}
         />
       )}

@@ -21,7 +21,15 @@ export function RevealStage({
   const { tokens } = useTheme();
   const [showResult, setShowResult] = useState(false);
 
+  // Reveal-text delay, skipped under reduced-motion (instant reveal).
   useEffect(() => {
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    ) {
+      setShowResult(true);
+      return;
+    }
     const timer = setTimeout(() => setShowResult(true), 1200);
     return () => clearTimeout(timer);
   }, []);
@@ -34,10 +42,19 @@ export function RevealStage({
     );
   }
 
-  // Server-computed result lives on state.lastChallengeResult. If somehow absent
-  // (race during reveal-broadcast catchup), fall back to neutral "?" display.
   const result = state.lastChallengeResult ?? null;
-  const loser = result ? state.players[result.loserIdx] : null;
+  // For 劈 the verified bid is the TARGET's bid, not the standing bid.
+  const verified = result?.verifiedBid ?? state.lastBid;
+  const wildCount = state.rules.aceWild && !verified.isZhai && !(state.palificoActive ?? false);
+  const loserNames = (result?.loserIds ?? [])
+    .map((id) => state.players.find((p) => p.id === id)?.nick ?? '?')
+    .join('、');
+  const kindLabel =
+    result?.kind === 'pi'
+      ? t('game.kindPi')
+      : result?.kind === 'tongsha'
+        ? t('game.kindTongsha')
+        : t('game.kindChallenge');
 
   return (
     <section className="flex flex-col gap-4">
@@ -62,20 +79,22 @@ export function RevealStage({
                 <AvatarBadge avatar={p.avatar} seed={p.id} seat={i + 1} size={26} />
                 {p.nick}
                 {isMe && <span style={{ color: tokens.colors.textMuted }}> {t('game.you')}</span>}
-                {!p.alive && <span style={{ color: tokens.colors.danger }}> 💀</span>}
+                {!p.alive && (
+                  <span style={{ color: tokens.colors.danger }} aria-label={t('game.eliminated')}>
+                    {' '}
+                    💀
+                  </span>
+                )}
               </span>
-              <div className="flex gap-1 text-2xl">
-                {hand.map((face, i) => {
-                  const counted =
-                    face === state.lastBid?.face ||
-                    (face === 1 && state.rules.aceWild && !state.lastBid?.isZhai);
+              <div className="flex gap-1 text-2xl" aria-label={`${p.nick}: ${hand.join(', ')}`}>
+                {hand.map((face, j) => {
+                  const counted = face === verified.face || (face === 1 && wildCount);
                   return (
                     <span
                       /* biome-ignore lint/suspicious/noArrayIndexKey: positional dice */
-                      key={i}
-                      style={{
-                        color: counted ? tokens.colors.accent : tokens.colors.text,
-                      }}
+                      key={j}
+                      aria-hidden
+                      style={{ color: counted ? tokens.colors.accent : tokens.colors.text }}
                     >
                       {DICE_GLYPHS[face - 1]}
                     </span>
@@ -88,16 +107,22 @@ export function RevealStage({
       </div>
 
       {showResult && result && (
-        <div className="flex flex-col items-center gap-2 mt-2">
+        <output className="flex flex-col items-center gap-2 mt-2">
+          <p className="text-sm uppercase tracking-wide" style={{ color: tokens.colors.accent }}>
+            {kindLabel}
+          </p>
           <p style={{ color: tokens.colors.text }}>
-            {t('game.bidLabel')} <span className="num">{state.lastBid.count}</span>
+            {t('game.bidLabel')} <span className="num">{verified.count}</span>
             {' × '}
-            {DICE_GLYPHS[state.lastBid.face - 1]} · {t('game.actualLabel')}{' '}
+            {DICE_GLYPHS[verified.face - 1]} · {t('game.actualLabel')}{' '}
             <span className="num">{result.actualCount}</span>
           </p>
-          {loser && (
+          {loserNames && (
             <p className="text-lg" style={{ color: tokens.colors.danger }}>
-              {t('game.loserLostDie', { name: loser.nick })}
+              💀 {loserNames}{' '}
+              {result.loserIds.length === 1 && result.diceLost > 1
+                ? t('game.lostNDice', { n: result.diceLost })
+                : t('game.lostDie')}
             </p>
           )}
           {result.gameEnded && result.winnerIdx >= 0 && (
@@ -105,7 +130,7 @@ export function RevealStage({
               {t('game.champion', { name: state.players[result.winnerIdx]?.nick ?? '?' })}
             </p>
           )}
-        </div>
+        </output>
       )}
     </section>
   );
