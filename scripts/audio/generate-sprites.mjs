@@ -9,7 +9,9 @@
 //   win     [2200, 1000ms ]
 //   lose    [3200, 1000ms ]
 //   click   [4200,  100ms ]
-//   total: 4300ms
+//   settle  [4300,  300ms ]
+//   stinger [4600,  900ms ]
+//   total: 5500ms
 //
 // Regenerate: node scripts/audio/generate-sprites.mjs
 // Outputs:    public/audio/{modern,classic,hk,cartoon}.{mp3,webm}
@@ -101,6 +103,22 @@ const recipes = {
       inputs: [noise('white', 0.1, 0.5)],
       filter: '[0]highpass=f=3000,afade=t=in:d=0.002,afade=t=out:d=0.08:st=0.02,volume=1.0[out]',
     }),
+    settle: () => ({
+      // Soft metallic landing — dice coming to rest.
+      inputs: [noise('white', 0.3, 0.4), sine(320, 0.3)],
+      filter:
+        '[0]bandpass=f=700:w=600,afade=t=in:d=0.005,afade=t=out:d=0.26:st=0.04,volume=1.0[a];' +
+        '[1]afade=t=out:d=0.25:st=0.02,volume=0.4[b];' +
+        '[a][b]amix=inputs=2:duration=longest:normalize=0,volume=1.1[out]',
+    }),
+    stinger: () => ({
+      // Dramatic riser — low ascending sweep + tense drone (开 suspense).
+      inputs: [synth('sin(2*PI*(130+200*t)*t)', 0.9), sine(196, 0.9)],
+      filter:
+        '[0]afade=t=in:d=0.05,afade=t=out:d=0.25:st=0.65,volume=0.6[a];' +
+        '[1]tremolo=f=9:d=0.4,afade=t=in:d=0.05,afade=t=out:d=0.3:st=0.6,volume=0.4[b];' +
+        '[a][b]amix=inputs=2:duration=longest:normalize=0,volume=1.2[out]',
+    }),
   },
 
   classic: {
@@ -147,6 +165,22 @@ const recipes = {
       inputs: [noise('pink', 0.1, 0.6)],
       filter:
         '[0]bandpass=f=1200:w=800,afade=t=in:d=0.002,afade=t=out:d=0.08:st=0.02,volume=1.2[out]',
+    }),
+    settle: () => ({
+      // Warm wooden settle.
+      inputs: [noise('pink', 0.3, 0.5), sine(220, 0.3)],
+      filter:
+        '[0]bandpass=f=420:w=400,afade=t=in:d=0.005,afade=t=out:d=0.26:st=0.04,volume=1.2[a];' +
+        '[1]afade=t=out:d=0.25:st=0.02,volume=0.45[b];' +
+        '[a][b]amix=inputs=2:duration=longest:normalize=0,volume=1.2[out]',
+    }),
+    stinger: () => ({
+      // Low warm drone with slow tremolo — bar-room tension.
+      inputs: [synth('sin(2*PI*(100+150*t)*t)', 0.9), sine(147, 0.9)],
+      filter:
+        '[0]afade=t=in:d=0.06,afade=t=out:d=0.3:st=0.6,volume=0.6[a];' +
+        '[1]tremolo=f=7:d=0.45,afade=t=in:d=0.06,afade=t=out:d=0.35:st=0.55,volume=0.45[b];' +
+        '[a][b]amix=inputs=2:duration=longest:normalize=0,volume=1.2[out]',
     }),
   },
 
@@ -195,6 +229,22 @@ const recipes = {
       filter:
         '[0]bandpass=f=1500:w=1000,afade=t=in:d=0.002,afade=t=out:d=0.08:st=0.02,volume=1.0[out]',
     }),
+    settle: () => ({
+      // Porcelain settle with a touch of echo.
+      inputs: [noise('pink', 0.3, 0.45), sine(620, 0.3)],
+      filter:
+        '[0]bandpass=f=750:w=550,aecho=0.7:0.6:40:0.25,afade=t=in:d=0.005,afade=t=out:d=0.26:st=0.04,volume=1.1[a];' +
+        '[1]afade=t=out:d=0.25:st=0.02,volume=0.4[b];' +
+        '[a][b]amix=inputs=2:duration=longest:normalize=0,volume=1.1[out]',
+    }),
+    stinger: () => ({
+      // Neon riser with echo tail.
+      inputs: [synth('sin(2*PI*(160+260*t)*t)', 0.9), sine(330, 0.9)],
+      filter:
+        '[0]aecho=0.7:0.6:90:0.3,afade=t=in:d=0.05,afade=t=out:d=0.25:st=0.65,volume=0.55[a];' +
+        '[1]tremolo=f=10:d=0.4,afade=t=in:d=0.05,afade=t=out:d=0.3:st=0.6,volume=0.4[b];' +
+        '[a][b]amix=inputs=2:duration=longest:normalize=0,volume=1.15[out]',
+    }),
   },
 
   cartoon: {
@@ -241,6 +291,23 @@ const recipes = {
       inputs: [synth('sin(2*PI*(2500-1000*t)*t)', 0.1)],
       filter: '[0]afade=t=in:d=0.002,afade=t=out:d=0.08:st=0.02,volume=0.7[out]',
     }),
+    settle: () => ({
+      // Cartoon plop — quick descending boop landing.
+      inputs: [synth('sin(2*PI*(520-260*t)*t)', 0.3), noise('white', 0.3, 0.2)],
+      filter:
+        '[0]volume=0.6[a];' +
+        '[1]highpass=f=2000,afade=t=out:d=0.2:st=0.05,volume=0.4[b];' +
+        '[a][b]amix=inputs=2:duration=longest:normalize=0,afade=t=in:d=0.005,afade=t=out:d=0.24:st=0.05,volume=1.2[out]',
+    }),
+    stinger: () => ({
+      // Comedic "dun-dun-dunnn" — three descending stabs.
+      inputs: [sine(330, 0.3), sine(294, 0.3), sine(220, 0.3)],
+      filter:
+        '[0]afade=t=in:d=0.01,afade=t=out:d=0.22:st=0.06,volume=0.6[a];' +
+        '[1]afade=t=in:d=0.01,afade=t=out:d=0.22:st=0.06,volume=0.6[b];' +
+        '[2]afade=t=in:d=0.01,afade=t=out:d=0.26:st=0.04,volume=0.7[c];' +
+        '[a][b][c]concat=n=3:v=0:a=1[out]',
+    }),
   },
 };
 
@@ -254,7 +321,12 @@ const segments = [
   ['win', 1.0],
   ['lose', 1.0],
   ['click', 0.1],
+  ['settle', 0.3],
+  ['stinger', 0.9],
 ];
+
+// Master total = sum of segment durations (must match useDiceAudio sprite map).
+const TOTAL_SEC = segments.reduce((s, [, d]) => s + d, 0); // 5.5
 
 function ffmpeg(args) {
   execFileSync('ffmpeg', args, { stdio: 'pipe' });
@@ -326,8 +398,8 @@ function concatAndEncode(theme, segWavs) {
     masterWav,
   ]);
   const got = ffprobeDuration(masterWav);
-  if (Math.abs(got - 4.3) > 0.005) {
-    throw new Error(`${theme} master duration drift: expected 4.3, got ${got}`);
+  if (Math.abs(got - TOTAL_SEC) > 0.005) {
+    throw new Error(`${theme} master duration drift: expected ${TOTAL_SEC}, got ${got}`);
   }
 
   const mp3Out = join(OUT_DIR, `${theme}.mp3`);
