@@ -43,7 +43,8 @@
     "modifyRules": "修改规则",
     "startGame": "开始游戏",
     "needMorePlayers": "至少 2 人才能开始",
-    "leaveRoom": "离开房间"
+    "leaveRoom": "离开房间",
+    "avatarHeader": "选择头像"
   },
   "game": {
     "round": "第 {n} 局",
@@ -128,5 +129,20 @@
     "classic-bar": "经典酒桌",
     "hk-neon": "港风霓虹",
     "cartoon": "卡通可爱"
+  },
+  "avatars": {
+    "numeric": "座位号",
+    "fox": "狐狸",
+    "tiger": "老虎",
+    "dragon": "龙",
+    "panda": "熊猫",
+    "owl": "猫头鹰",
+    "frog": "青蛙",
+    "rooster": "公鸡",
+    "rabbit": "兔子",
+    "cat": "猫",
+    "wolf": "狼",
+    "lion": "狮子",
+    "monkey": "猴子"
   }
 }

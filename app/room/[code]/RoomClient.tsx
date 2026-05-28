@@ -1,28 +1,24 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useTheme } from '@/components/theme/ThemeProvider';
-import { useRoomEvents } from '@/components/game/useRoomEvents';
-import { DiceScene, type DicePhase } from '@/components/dice/DiceScene';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AvatarPicker } from '@/components/customization/AvatarPicker';
+import { CustomizationDrawer } from '@/components/customization/CustomizationDrawer';
+import { type DicePhase, DiceScene } from '@/components/dice/DiceScene';
+import { AvatarBadge } from '@/components/game/AvatarBadge';
+import { BidChain } from '@/components/game/BidChain';
 import { BidPanel } from '@/components/game/BidPanel';
 import { PlayerRing } from '@/components/game/PlayerRing';
-import { BidChain } from '@/components/game/BidChain';
 import { RevealStage } from '@/components/game/RevealStage';
-import { CustomizationDrawer } from '@/components/customization/CustomizationDrawer';
+import { useRoomEvents } from '@/components/game/useRoomEvents';
 import { useShakeDetector } from '@/components/shake/useShakeDetector';
-import { useDiceAudio } from '@/lib/audio/useDiceAudio';
+import { useTheme } from '@/components/theme/ThemeProvider';
 import { unlockAudio } from '@/lib/audio/howl-instance';
+import { useDiceAudio } from '@/lib/audio/useDiceAudio';
 import type { GameRules, RoomState } from '@/lib/game-engine/types';
 
-export function RoomClient({
-  initialState,
-  code,
-}: {
-  initialState: RoomState;
-  code: string;
-}) {
+export function RoomClient({ initialState, code }: { initialState: RoomState; code: string }) {
   const t = useTranslations();
   const { tokens } = useTheme();
   const router = useRouter();
@@ -122,6 +118,19 @@ export function RoomClient({
     });
   }
 
+  async function handleSetAvatar(avatar: string) {
+    // Optimistic: reflect locally immediately; SSE refetch reconciles.
+    setState((prev) => ({
+      ...prev,
+      players: prev.players.map((p) => (p.id === myPlayerId ? { ...p, avatar } : p)),
+    }));
+    await fetch('/api/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'setAvatar', code, avatar }),
+    });
+  }
+
   return (
     <main className="min-h-[100dvh] safe-top safe-bottom flex flex-col px-4 py-6 gap-6 max-w-md mx-auto w-full">
       {/* Header */}
@@ -163,7 +172,7 @@ export function RoomClient({
         </div>
       </div>
 
-      <hr style={{ borderColor: tokens.colors.textMuted + '33' }} />
+      <hr style={{ borderColor: `${tokens.colors.textMuted}33` }} />
 
       {/* Phase-driven view */}
       {state.phase === 'lobby' ? (
@@ -174,6 +183,7 @@ export function RoomClient({
           busy={busy}
           onStart={handleStart}
           onLeave={handleLeave}
+          onSetAvatar={handleSetAvatar}
           myPlayerId={myPlayerId}
         />
       ) : (
@@ -200,6 +210,7 @@ function LobbyView({
   busy,
   onStart,
   onLeave,
+  onSetAvatar,
   myPlayerId,
 }: {
   state: RoomState;
@@ -208,10 +219,13 @@ function LobbyView({
   busy: boolean;
   onStart: () => void;
   onLeave: () => void;
+  onSetAvatar: (avatar: string) => void;
   myPlayerId: string | null;
 }) {
   const t = useTranslations();
   const { tokens } = useTheme();
+  const mySeat = state.players.findIndex((p) => p.id === myPlayerId);
+  const myPlayer = mySeat >= 0 ? state.players[mySeat] : null;
   return (
     <>
       <section>
@@ -219,38 +233,55 @@ function LobbyView({
           {t('lobby.playersCount', { count: state.players.length, max: 8 })}
         </p>
         <ul className="flex flex-col gap-2">
-          {state.players.map((p) => {
+          {state.players.map((p, i) => {
             const isMe = p.id === myPlayerId;
             const isHost = p.id === state.ownerId;
             return (
               <li
                 key={p.id}
-                className="flex items-center justify-between p-3 rounded-xl"
+                className="flex items-center gap-3 p-3 rounded-xl"
                 style={{ backgroundColor: tokens.colors.surface }}
               >
+                <AvatarBadge avatar={p.avatar} seed={p.id} seat={i + 1} />
                 <span style={{ color: tokens.colors.text }}>
                   {isHost && <span style={{ color: tokens.colors.accent }}>★ </span>}
                   {p.nick}
-                  {isMe && <span style={{ color: tokens.colors.textMuted }}> {t('lobby.you')}</span>}
-                </span>
-                <span className="text-xs num" style={{ color: tokens.colors.textMuted }}>
-                  {p.avatar}
+                  {isMe && (
+                    <span style={{ color: tokens.colors.textMuted }}> {t('lobby.you')}</span>
+                  )}
                 </span>
               </li>
             );
           })}
-          {Array.from({ length: Math.max(0, 2 - state.players.length) }).map((_, i) => (
-            /* biome-ignore lint/suspicious/noArrayIndexKey: placeholder slots */
-            <li key={`empty-${i}`} className="p-3 rounded-xl border border-dashed"
-              style={{ borderColor: tokens.colors.textMuted + '44', color: tokens.colors.textMuted }}>
+          {['waiting-a', 'waiting-b'].slice(0, Math.max(0, 2 - state.players.length)).map((key) => (
+            <li
+              key={key}
+              className="p-3 rounded-xl border border-dashed"
+              style={{
+                borderColor: `${tokens.colors.textMuted}44`,
+                color: tokens.colors.textMuted,
+              }}
+            >
               ⋯ {t('lobby.waiting')}
             </li>
           ))}
         </ul>
       </section>
 
+      {myPlayer && (
+        <AvatarPicker
+          value={myPlayer.avatar}
+          seat={mySeat + 1}
+          seed={myPlayer.id}
+          onSelect={onSetAvatar}
+        />
+      )}
+
       <section>
-        <p className="text-xs uppercase tracking-wide mb-2" style={{ color: tokens.colors.textMuted }}>
+        <p
+          className="text-xs uppercase tracking-wide mb-2"
+          style={{ color: tokens.colors.textMuted }}
+        >
           {t('lobby.rulesHeader')}
         </p>
         <p className="text-sm" style={{ color: tokens.colors.text }}>
@@ -278,9 +309,7 @@ function LobbyView({
               color: canStart ? tokens.colors.bg : tokens.colors.textMuted,
             }}
           >
-            {canStart
-              ? t('lobby.startGame')
-              : t('lobby.needMorePlayers')}
+            {canStart ? t('lobby.startGame') : t('lobby.needMorePlayers')}
           </button>
         )}
         <button
@@ -336,7 +365,9 @@ function GameView({
     }
   });
 
-  // Fetch my hand when game running
+  // Fetch my hand when game running. state.round is an intentional refetch
+  // trigger — fresh dice are dealt each round even though the URL is unchanged.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: round drives refetch
   useEffect(() => {
     if (state.phase !== 'rolling' && state.phase !== 'bidding' && state.phase !== 'reveal') return;
     fetch(`/api/hand/${state.code}`)
@@ -462,7 +493,7 @@ function GameView({
           }}
         >
           {peeking
-            ? '🎲 ' + hand.map((f) => ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][f - 1] || f).join(' · ')
+            ? `🎲 ${hand.map((f) => ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][f - 1] || f).join(' · ')}`
             : t('game.peekHand')}
         </button>
       )}
@@ -487,17 +518,19 @@ function GameView({
         <RevealStage state={state} hands={allHands} myPlayerId={myPlayerId} />
       )}
 
-      {state.phase === 'reveal' && state.lastChallengeResult && !state.lastChallengeResult.gameEnded && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={submitNextRound}
-          className="py-3 rounded-2xl font-medium disabled:opacity-40"
-          style={{ backgroundColor: tokens.colors.primary, color: tokens.colors.bg }}
-        >
-          {t('game.nextRound')}
-        </button>
-      )}
+      {state.phase === 'reveal' &&
+        state.lastChallengeResult &&
+        !state.lastChallengeResult.gameEnded && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={submitNextRound}
+            className="py-3 rounded-2xl font-medium disabled:opacity-40"
+            style={{ backgroundColor: tokens.colors.primary, color: tokens.colors.bg }}
+          >
+            {t('game.nextRound')}
+          </button>
+        )}
 
       {state.phase === 'game_end' && (
         <div className="flex flex-col items-center gap-3 mt-4">

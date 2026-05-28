@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useEffect, useState } from 'react';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import type { RoomState } from '@/lib/game-engine/types';
+import { AvatarBadge } from './AvatarBadge';
 
 const DICE_GLYPHS = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅', '7', '8'];
 
@@ -40,15 +41,12 @@ export function RevealStage({
 
   return (
     <section className="flex flex-col gap-4">
-      <h2
-        className="text-2xl font-display text-center"
-        style={{ color: tokens.colors.primary }}
-      >
+      <h2 className="text-2xl font-display text-center" style={{ color: tokens.colors.primary }}>
         {t('game.revealHeader')}
       </h2>
 
       <div className="flex flex-col gap-2">
-        {state.players.map((p) => {
+        {state.players.map((p, i) => {
           const hand = hands[p.id] ?? [];
           const isMe = p.id === myPlayerId;
           return (
@@ -60,14 +58,11 @@ export function RevealStage({
                 outline: isMe ? `1px solid ${tokens.colors.primary}80` : 'none',
               }}
             >
-              <span style={{ color: tokens.colors.text }}>
+              <span className="flex items-center gap-2" style={{ color: tokens.colors.text }}>
+                <AvatarBadge avatar={p.avatar} seed={p.id} seat={i + 1} size={26} />
                 {p.nick}
-                {isMe && (
-                  <span style={{ color: tokens.colors.textMuted }}> {t('game.you')}</span>
-                )}
-                {!p.alive && (
-                  <span style={{ color: tokens.colors.danger }}> 💀</span>
-                )}
+                {isMe && <span style={{ color: tokens.colors.textMuted }}> {t('game.you')}</span>}
+                {!p.alive && <span style={{ color: tokens.colors.danger }}> 💀</span>}
               </span>
               <div className="flex gap-1 text-2xl">
                 {hand.map((face, i) => {
@@ -95,11 +90,9 @@ export function RevealStage({
       {showResult && result && (
         <div className="flex flex-col items-center gap-2 mt-2">
           <p style={{ color: tokens.colors.text }}>
-            {t('game.bidLabel')}{' '}
-            <span className="num">{state.lastBid.count}</span>
+            {t('game.bidLabel')} <span className="num">{state.lastBid.count}</span>
             {' × '}
-            {DICE_GLYPHS[state.lastBid.face - 1]} ·{' '}
-            {t('game.actualLabel')}{' '}
+            {DICE_GLYPHS[state.lastBid.face - 1]} · {t('game.actualLabel')}{' '}
             <span className="num">{result.actualCount}</span>
           </p>
           {loser && (
@@ -108,10 +101,7 @@ export function RevealStage({
             </p>
           )}
           {result.gameEnded && result.winnerIdx >= 0 && (
-            <p
-              className="mt-3 text-xl font-display"
-              style={{ color: tokens.colors.accent }}
-            >
+            <p className="mt-3 text-xl font-display" style={{ color: tokens.colors.accent }}>
               {t('game.champion', { name: state.players[result.winnerIdx]?.nick ?? '?' })}
             </p>
           )}

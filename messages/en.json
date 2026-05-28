@@ -43,7 +43,8 @@
     "modifyRules": "Modify rules",
     "startGame": "Start game",
     "needMorePlayers": "Need at least 2 players",
-    "leaveRoom": "Leave room"
+    "leaveRoom": "Leave room",
+    "avatarHeader": "Choose avatar"
   },
   "game": {
     "round": "Round {n}",
@@ -128,5 +129,20 @@
     "classic-bar": "Classic Bar",
     "hk-neon": "HK Neon",
     "cartoon": "Cartoon"
+  },
+  "avatars": {
+    "numeric": "Seat number",
+    "fox": "Fox",
+    "tiger": "Tiger",
+    "dragon": "Dragon",
+    "panda": "Panda",
+    "owl": "Owl",
+    "frog": "Frog",
+    "rooster": "Rooster",
+    "rabbit": "Rabbit",
+    "cat": "Cat",
+    "wolf": "Wolf",
+    "lion": "Lion",
+    "monkey": "Monkey"
   }
 }

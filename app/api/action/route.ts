@@ -1,23 +1,32 @@
-import { type NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { readSession, updateSession } from '@/lib/auth/session-store';
+import { type NextRequest, NextResponse } from 'next/server';
 import { validateNickname } from '@/lib/auth/session';
-import { isValidInviteCode } from '@/lib/room/invite-code';
+import { readSession, updateSession } from '@/lib/auth/session-store';
+import { normalizeAvatar } from '@/lib/avatars';
+import type { Face, GameRules, RoomState } from '@/lib/game-engine/types';
+import { isValidBid } from '@/lib/game-engine/validate';
 import { runScript } from '@/lib/lua/run';
 import { redis } from '@/lib/redis';
-import { isValidBid } from '@/lib/game-engine/validate';
 import { rollDice } from '@/lib/room/dice-rng';
-import type { Face, GameRules, RoomState } from '@/lib/game-engine/types';
+import { isValidInviteCode } from '@/lib/room/invite-code';
 
 export const runtime = 'nodejs';
 
 type Action =
   | { type: 'join'; code: string; nick: string; avatar?: string }
   | { type: 'start'; code: string }
-  | { type: 'bid'; code: string; count: number; face: Face; isZhai: boolean; expectedVersion: number }
+  | {
+      type: 'bid';
+      code: string;
+      count: number;
+      face: Face;
+      isZhai: boolean;
+      expectedVersion: number;
+    }
   | { type: 'challenge'; code: string; expectedVersion: number }
   | { type: 'nextRound'; code: string; expectedVersion: number }
   | { type: 'leave'; code: string }
+  | { type: 'setAvatar'; code: string; avatar: string }
   | { type: 'updateRules'; code: string; rules: GameRules };
 
 export async function POST(req: NextRequest) {
@@ -40,11 +49,11 @@ export async function POST(req: NextRequest) {
       const v = validateNickname(body.nick);
       if (!v.ok) return NextResponse.json({ ok: false, reason: v.reason }, { status: 400 });
       await updateSession(token, { nick: v.value, currentRoom: code });
-      const result = await runScript('joinRoom', [stateKey], [
-        session.playerId,
-        v.value,
-        body.avatar ?? 'numeric',
-      ]);
+      const result = await runScript(
+        'joinRoom',
+        [stateKey],
+        [session.playerId, v.value, normalizeAvatar(body.avatar)],
+      );
       const status = !result.ok && result.reason === 'room_full' ? 403 : 200;
       return NextResponse.json(result, { status: result.ok ? 200 : status });
     }
@@ -83,13 +92,17 @@ export async function POST(req: NextRequest) {
       if (!validation.ok) {
         return NextResponse.json({ ok: false, reason: validation.reason }, { status: 400 });
       }
-      const result = await runScript('placeBid', [stateKey], [
-        session.playerId,
-        String(body.count),
-        String(body.face),
-        body.isZhai ? '1' : '0',
-        String(body.expectedVersion),
-      ]);
+      const result = await runScript(
+        'placeBid',
+        [stateKey],
+        [
+          session.playerId,
+          String(body.count),
+          String(body.face),
+          body.isZhai ? '1' : '0',
+          String(body.expectedVersion),
+        ],
+      );
       return NextResponse.json(result);
     }
 
@@ -124,6 +137,15 @@ export async function POST(req: NextRequest) {
       // Clear currentRoom on session even if removal failed (best-effort)
       await updateSession(token, { currentRoom: null });
       return NextResponse.json(result);
+    }
+
+    case 'setAvatar': {
+      const result = await runScript(
+        'setAvatar',
+        [stateKey],
+        [session.playerId, normalizeAvatar(body.avatar)],
+      );
+      return NextResponse.json(result, { status: result.ok ? 200 : 400 });
     }
 
     case 'updateRules': {

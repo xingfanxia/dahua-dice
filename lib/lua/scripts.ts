@@ -282,6 +282,33 @@ redis.call('PUBLISH', 'room:' .. state.code .. ':events', roundPayload)
 return cjson.encode({ok=true, version=state.version})
 `;
 
+// setAvatar: updates a player's cosmetic avatar id. Allowed in any phase.
+export const setAvatar = `
+local stateKey = KEYS[1]
+local playerId = ARGV[1]
+local avatar = ARGV[2]
+local raw = redis.call('GET', stateKey)
+if not raw then return cjson.encode({ok=false, reason='no_room'}) end
+local state = cjson.decode(raw)
+local found = false
+for i = 1, #state.players do
+  if state.players[i].id == playerId then
+    state.players[i].avatar = avatar
+    found = true
+    break
+  end
+end
+if not found then return cjson.encode({ok=false, reason='not_in_room'}) end
+state.version = state.version + 1
+local ttl = 21600
+if state.phase == 'lobby' then ttl = 1800 end
+redis.call('SET', stateKey, cjson.encode(state), 'EX', ttl)
+local payload = cjson.encode({type='avatar_updated', payload={playerId=playerId, avatar=avatar}, version=state.version})
+redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', payload)
+redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
+return cjson.encode({ok=true, version=state.version})
+`;
+
 // leaveRoom: removes player from room. If owner leaves, transfers to earliest joiner.
 // If only 1 alive remains during an active game, ends the game.
 export const leaveRoom = `
