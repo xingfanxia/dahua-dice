@@ -1,14 +1,39 @@
 'use client';
 
-import dynamic from 'next/dynamic';
+import { Dice2D, type DicePhase } from './Dice2D';
 
-export type { DicePhase } from './DiceCanvas';
+export type { DicePhase };
 
 /**
- * Lazy-loaded wrapper for the 3D dice canvas. Prevents bundling Three.js into the
- * initial route load and avoids SSR (Three.js requires window/document).
+ * DiceScene — the player's dice display. Backed by a 2D DOM/CSS renderer
+ * (no WebGL / Three.js), so it needs no dynamic import. The import path
+ * '@/components/dice/DiceScene' and the named export stay stable for callers.
  */
-export const DiceScene = dynamic(
-  () => import('./DiceCanvas').then((m) => ({ default: m.DiceCanvas })),
-  { ssr: false, loading: () => <div className="w-full aspect-square bg-surface animate-pulse" /> },
-);
+export function DiceScene({
+  diceCount,
+  phase,
+  hand,
+  sides,
+  onCollision,
+  onAllSettled,
+}: {
+  diceCount: number;
+  phase: DicePhase;
+  /** The caller's own dice faces, if known. When omitted, dice render face-down. */
+  hand?: number[] | null;
+  /** Faces per die (defaults to 6; pass 8 for the 8-sided variant). */
+  sides?: number;
+  onCollision?: (force: number) => void;
+  onAllSettled?: (faces: number[]) => void;
+}) {
+  return (
+    <Dice2D
+      diceCount={diceCount}
+      phase={phase}
+      hand={hand}
+      sides={sides}
+      onCollision={onCollision}
+      onAllSettled={onAllSettled}
+    />
+  );
+}

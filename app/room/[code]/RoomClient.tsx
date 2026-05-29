@@ -62,9 +62,10 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
     refetch();
   });
 
-  // Safety-net polling (every 10s) in case SSE drops
+  // Safety-net polling (every 3s) in case SSE drops, so turn/phase updates still
+  // land quickly. The in-flight guard in refetch() collapses overlapping polls.
   useEffect(() => {
-    const interval = setInterval(refetch, 10000);
+    const interval = setInterval(refetch, 3000);
     return () => clearInterval(interval);
   }, [refetch]);
 
@@ -276,7 +277,7 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
           myPlayerId={myPlayerId}
         />
       ) : (
-        <GameView state={state} myPlayerId={myPlayerId} code={code} />
+        <GameView state={state} myPlayerId={myPlayerId} code={code} refetch={refetch} />
       )}
 
       <CustomizationDrawer
@@ -418,17 +419,65 @@ function GameView({
   state,
   myPlayerId,
   code,
+  refetch,
 }: {
   state: RoomState;
   myPlayerId: string | null;
   code: string;
+  refetch: () => Promise<void>;
 }) {
   const t = useTranslations();
   const { tokens } = useTheme();
   const [hand, setHand] = useState<number[] | null>(null);
   const [allHands, setAllHands] = useState<Record<string, number[]> | null>(null);
-  const [peeking, setPeeking] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Surfaces a swallowed action failure ("can't bid") for ~3s. The root cause of
+  // the silent failure was every submit doing `await fetch()` and ignoring the
+  // result; flashAction is the shared sink for those errors. A 409 (stale CAS)
+  // additionally triggers refetch() so the client re-syncs to the live turn.
+  const [actionError, setActionError] = useState<string | null>(null);
+  const actionErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashAction = useCallback((msg: string) => {
+    setActionError(msg);
+    if (actionErrorTimer.current) clearTimeout(actionErrorTimer.current);
+    actionErrorTimer.current = setTimeout(() => setActionError(null), 3000);
+  }, []);
+  useEffect(
+    () => () => {
+      if (actionErrorTimer.current) clearTimeout(actionErrorTimer.current);
+    },
+    [],
+  );
+
+  // POST an action, surface failures, and re-sync on a stale-version (409) reject.
+  // Returns true on success. `stale` means the server moved on (someone else acted
+  // or the turn advanced) — refetch pulls the live state so the player can retry.
+  const postAction = useCallback(
+    async (payload: Record<string, unknown>): Promise<boolean> => {
+      try {
+        const res = await fetch('/api/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({ ok: false }) as { ok: false });
+        if (!data.ok) {
+          if (data.reason === 'stale') {
+            await refetch();
+            flashAction(t('game.staleResynced'));
+          } else {
+            flashAction(t('game.actionFailed'));
+          }
+          return false;
+        }
+        return true;
+      } catch {
+        flashAction(t('game.actionFailed'));
+        return false;
+      }
+    },
+    [refetch, flashAction, t],
+  );
   const audio = useDiceAudio();
   const router = useRouter();
   const phaseRef = useRef(state.phase);
@@ -458,9 +507,15 @@ function GameView({
 
   // Fetch my hand when game running. state.round is an intentional refetch
   // trigger — fresh dice are dealt each round even though the URL is unchanged.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: round drives refetch
+  const lastRoundRef = useRef(state.round);
   useEffect(() => {
     if (state.phase !== 'rolling' && state.phase !== 'bidding' && state.phase !== 'reveal') return;
+    // New round → clear the prior hand first so the dice re-roll cleanly: no stale
+    // faces flash, and even an identical re-deal still re-triggers the roll animation.
+    if (lastRoundRef.current !== state.round) {
+      lastRoundRef.current = state.round;
+      setHand(null);
+    }
     fetch(`/api/hand/${state.code}`)
       .then((r) => r.json())
       .then((d) => {
@@ -504,17 +559,13 @@ function GameView({
   }) {
     setBusy(true);
     try {
-      await fetch('/api/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'bid',
-          code,
-          count: bid.count,
-          face: bid.face,
-          isZhai: bid.isZhai,
-          expectedVersion: state.version,
-        }),
+      await postAction({
+        type: 'bid',
+        code,
+        count: bid.count,
+        face: bid.face,
+        isZhai: bid.isZhai,
+        expectedVersion: state.version,
       });
     } finally {
       setBusy(false);
@@ -525,15 +576,7 @@ function GameView({
     audio.stinger(); // dramatic 开 sound (spec journey #10)
     setBusy(true);
     try {
-      await fetch('/api/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'challenge',
-          code,
-          expectedVersion: state.version,
-        }),
-      });
+      await postAction({ type: 'challenge', code, expectedVersion: state.version });
     } finally {
       setBusy(false);
     }
@@ -542,11 +585,7 @@ function GameView({
   async function submitPi(targetPlayerId: string) {
     setBusy(true);
     try {
-      await fetch('/api/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'pi', code, targetPlayerId, expectedVersion: state.version }),
-      });
+      await postAction({ type: 'pi', code, targetPlayerId, expectedVersion: state.version });
     } finally {
       setBusy(false);
     }
@@ -555,11 +594,7 @@ function GameView({
   async function submitTongsha() {
     setBusy(true);
     try {
-      await fetch('/api/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'tongsha', code, expectedVersion: state.version }),
-      });
+      await postAction({ type: 'tongsha', code, expectedVersion: state.version });
     } finally {
       setBusy(false);
     }
@@ -568,15 +603,7 @@ function GameView({
   async function submitNextRound() {
     setBusy(true);
     try {
-      await fetch('/api/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'nextRound',
-          code,
-          expectedVersion: state.version,
-        }),
-      });
+      await postAction({ type: 'nextRound', code, expectedVersion: state.version });
     } finally {
       setBusy(false);
     }
@@ -611,6 +638,16 @@ function GameView({
 
   return (
     <section className="flex-1 flex flex-col gap-4">
+      {actionError && (
+        <div
+          className="text-xs text-center py-1.5 rounded-lg"
+          role="alert"
+          style={{ backgroundColor: `${tokens.colors.danger}22`, color: tokens.colors.danger }}
+        >
+          {actionError}
+        </div>
+      )}
+
       {/* Screen-reader announcer for turn / phase / standing bid (spec §17C). */}
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {state.phase === 'bidding'
@@ -639,33 +676,17 @@ function GameView({
         <DiceScene
           diceCount={diceCount}
           phase={dicePhase}
+          hand={hand}
           onCollision={(force) => audio.collide('dice', force)}
           onAllSettled={() => audio.settle()}
         />
       </div>
 
+      {/* Own hand for screen readers — the central DiceScene renders it visually. */}
       {hand && state.phase !== 'reveal' && (
-        <button
-          type="button"
-          onMouseDown={() => setPeeking(true)}
-          onMouseUp={() => setPeeking(false)}
-          onMouseLeave={() => setPeeking(false)}
-          onTouchStart={() => setPeeking(true)}
-          onTouchEnd={() => setPeeking(false)}
-          className="py-3 min-h-[44px] rounded-xl text-sm font-medium select-none"
-          style={{
-            backgroundColor: tokens.colors.surface,
-            color: tokens.colors.primary,
-            border: `1px solid ${tokens.colors.primary}55`,
-          }}
-          aria-label={`${t('game.peekHand')}: ${hand.join(', ')}`}
-        >
-          <span aria-hidden="true">
-            {peeking
-              ? `🎲 ${hand.map((f) => ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][f - 1] || f).join(' · ')}`
-              : t('game.peekHand')}
-          </span>
-        </button>
+        <p className="sr-only" aria-live="polite">
+          {`${t('game.peekHand')}: ${hand.join(', ')}`}
+        </p>
       )}
 
       {state.phase === 'bidding' && isMyTurn && (

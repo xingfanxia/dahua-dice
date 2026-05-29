@@ -56,6 +56,8 @@
     "shakeYourPhone": "用力摇手机",
     "orTapHere": "或点这里",
     "peekHand": "查看我的骰子",
+    "yourDice": "你的骰子：{faces}",
+    "diceFaceDown": "{count} 颗骰子，暗置",
     "bid": "叫数",
     "challenge": "开",
     "challengeAction": "开 (挑战)",
@@ -101,7 +103,9 @@
     "diceLeftLabel": "剩 {n} 颗骰",
     "reconnecting": "重新连接中…",
     "disconnected": "已断开连接",
-    "rejoin": "重新加入"
+    "rejoin": "重新加入",
+    "actionFailed": "操作失败，请重试",
+    "staleResynced": "状态已更新，请重试"
   },
   "errors": {
     "network": "网络错误",

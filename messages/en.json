@@ -56,6 +56,8 @@
     "shakeYourPhone": "Shake your phone",
     "orTapHere": "or tap here",
     "peekHand": "Peek at my dice",
+    "yourDice": "Your dice: {faces}",
+    "diceFaceDown": "{count} dice, face down",
     "bid": "Bid",
     "challenge": "Challenge",
     "challengeAction": "Challenge",
@@ -101,7 +103,9 @@
     "diceLeftLabel": "{n} dice left",
     "reconnecting": "Reconnecting…",
     "disconnected": "Disconnected",
-    "rejoin": "Rejoin"
+    "rejoin": "Rejoin",
+    "actionFailed": "Action failed, please try again",
+    "staleResynced": "State updated — please try again"
   },
   "errors": {
     "network": "Network error",

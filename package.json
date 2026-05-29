@@ -15,16 +15,12 @@
     "e2e": "playwright test"
   },
   "dependencies": {
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.6.1",
-    "@react-three/rapier": "^2.2.0",
     "@upstash/redis": "^1.38.0",
     "howler": "^2.2.4",
     "next": "16.2.6",
     "next-intl": "^4.12.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "three": "^0.184.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -36,7 +32,6 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/three": "^0.184.1",
     "@vitest/coverage-v8": "^4.1.7",
     "@vitest/ui": "^4.1.7",
     "happy-dom": "^20.9.0",
