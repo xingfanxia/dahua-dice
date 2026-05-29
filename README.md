@@ -19,9 +19,10 @@ A 2-8 player Liar's Dice web app with 3D physics dice, gyroscope shake-to-roll, 
 - 🧑‍🤝‍🧑 **Player avatars** — pick from 12 glyphs or a numbered seat badge in the lobby; rendered as per-player tinted badges across lobby, turn ring, and reveal.
 - 🌐 **i18n** — zh-CN default + en, via `next-intl`.
 - 🔄 **Realtime multiplayer** via Upstash Redis + Vercel Fluid Compute SSE pipe (`/subscribe/{channel}` transparent stream), with Redis Stream (`XRANGE`) replay for reconnect catch-up.
-- 🔒 **Server-authoritative gameplay** — Lua scripts + CAS version locks for atomic bid/challenge mutations; dice rolled with `crypto.randomInt`; private hands are server-only and auth-gated per player (never broadcast before reveal).
-- 🎮 **Full ruleset** — standard Liar's Dice + 斋 (close-call) + 1点万能 toggle + 中式扩展 (劈/反劈/通杀) + Palifico (Perudo variant).
-- 🎵 **Per-theme audio** — Howler sprite packs synthesized with ffmpeg (resonant collision, multi-tap shake rattle, reveal/win/lose stingers), coupled to dice contact force. Regenerate with `node scripts/audio/generate-sprites.mjs`.
+- 🔒 **Server-authoritative gameplay** — challenge / 劈 / 通杀 / round resolution runs in a **pure, unit-tested engine** (`lib/game-engine/round.ts`) computed in Node, then committed atomically via version-CAS Lua; bids/joins are atomic Lua mutations. Inputs are Zod-validated at the boundary and rate-limited (30/min/session); dice rolled with `crypto.randomInt`; private hands are server-only and auth-gated per player (never broadcast before reveal).
+- 🎮 **Full ruleset** — standard Liar's Dice + 斋 (close-call) + 1点万能 + 叫1必斋 + the 中式扩展 (劈 challenge a non-adjacent bidder / 反劈 bite-back / 通杀 sweep-all) + Palifico (the one-die opener round). All toggleable in the lobby and enforced end-to-end.
+- ♿ **Accessibility** — full keyboard play (1-6 face · ±count · Enter bid · Space-to-challenge with confirm), ARIA live regions for turns/bids/reveal, `prefers-reduced-motion` static dice, themed focus rings, drawer focus-trap, ≥44px touch targets.
+- 🎵 **Per-theme audio** — Howler sprite packs synthesized with ffmpeg (resonant collision, multi-tap shake rattle, settle thunk, reveal/win/lose + dramatic 开 stinger), coupled to dice contact force. Regenerate with `node scripts/audio/generate-sprites.mjs`.
 
 ## Build & run locally
 
@@ -35,12 +36,12 @@ pnpm dev
 ## Test
 
 ```bash
-pnpm test            # 71 unit + integration tests (game engine, validation, resolve, state machine)
+pnpm test            # 68 unit + integration tests (game engine, validation, round resolution)
 pnpm test:coverage   # vitest + @vitest/coverage-v8
-pnpm e2e             # Playwright: happy-path, reconnect, axe a11y — chromium + webkit (mobile Safari)
+pnpm e2e             # Playwright: happy-path, reconnect, extensions, axe a11y — chromium + webkit (mobile Safari)
 ```
 
-The e2e suite drives two browser contexts through create → join → start → bid → challenge → reveal, a mid-game reload re-sync, and `@axe-core` WCAG A/AA scans of the home / lobby / bidding screens. It reuses a running `pnpm dev` (or starts one). First run needs the browsers: `pnpm exec playwright install chromium webkit`.
+The e2e suite (14 tests across 2 projects) drives two browser contexts through create → join → start → bid → challenge → reveal, a 通杀 (sweep) extension journey, a mid-game reload re-sync, and `@axe-core` WCAG A/AA scans of the home / lobby / bidding screens. It reuses a running `pnpm dev` (or starts one). First run needs the browsers: `pnpm exec playwright install chromium webkit`.
 
 ## Deploy
 
@@ -57,4 +58,4 @@ vercel --prod --scope panpanmao   # personal scope — never the computelabs tea
 
 ## Tech stack
 
-Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS v4 · Zustand · next-intl · @upstash/redis · @react-three/fiber 9 · @react-three/rapier 2 · @react-three/drei · howler · Biome v2 · Vitest · Playwright + @axe-core/playwright
+Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS v4 · Zustand · next-intl · zod · @upstash/redis · @react-three/fiber 9 · @react-three/rapier 2 · @react-three/drei · howler · Biome v2 · Vitest · Playwright + @axe-core/playwright

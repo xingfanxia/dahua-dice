@@ -336,7 +336,7 @@ Screen-by-screen ASCII wireframes. Visual hierarchy is explicit: what user sees 
 | Key | Type | Content | TTL |
 |---|---|---|---|
 | `room:{code}:state` | JSON String | `{ phase, players[], currentTurn, lastBid, isZhai, round, version, rules, theme }` | 6h, 30m if lobby |
-| `room:{code}:hands` | Hash | `playerId → encrypted dice values JSON` | 6h (server-only, only revealed on challenge) |
+| `room:{code}:hands` | Hash | `playerId → dice values JSON` (auth-gated, not app-encrypted) | 6h (server-only, only revealed on challenge) |
 | `room:{code}:events` | Redis Stream (XADD) | Event log: `{ type, payload, timestamp, version }` | 6h, capped at 200 events |
 | `room:{code}:lock` | String | Lua mutex for CAS critical section | 5s NX |
 | `session:{token}` | JSON String | `{ playerId, nick, currentRoom, theme, avatar, customization, createdAt }` | 24h |
@@ -344,7 +344,7 @@ Screen-by-screen ASCII wireframes. Visual hierarchy is explicit: what user sees 
 
 **Versioning (optimistic lock)**: `room:{code}:state` includes a `version` integer. Every Lua write checks `incoming.expected_version === current.version` and bumps it. Conflict → returns 409 to client; client re-fetches and retries.
 
-**Encryption of hands**: server keeps a server-only AES-256-GCM key in Vercel env var. `hands` are stored encrypted so even if Redis is dumped, dice values aren't exposed pre-reveal. Decrypted only at `challenge` phase to fan out to all clients.
+**Secrecy of hands** (revised — was "AES-256-GCM encryption"): hands are stored as plain JSON and protected by **application authz**, not app-layer crypto. A player reads only their own dice (`/api/hand`, session-token filtered); the full set is fanned out only at `reveal` (`/api/room/[code]/all-hands`, 403 before then). App-layer AES with a Vercel-env key was descoped because the key would be co-located with the Redis token (an attacker with one has the other), so it defends against nothing the authz gate doesn't. At-rest/in-transit protection is provided by Upstash (TLS + encryption at rest).
 
 **Free tier capacity check** (Upstash 2025 plan = 500K commands/month):
 - Per game: ~50-200 commands per player turn (state read + write + publish + event XADD)
@@ -654,7 +654,8 @@ Idle ~0, gentle shake ~0.2, strong shake ~0.8-1.0.
 ## 17. Security Model
 
 **Anti-cheat**:
-- Dice values stored encrypted server-side (`room:{code}:hands` AES-256-GCM, key from Vercel env var)
+- Dice values are server-side and **auth-gated** (not app-layer encrypted, see note). `room:{code}:hands` is read only via `GET /api/hand/[code]`, session-token-filtered to the caller's own dice; all-hands returns 403 until the `reveal` phase.
+  - *AES-256-GCM was descoped (deviation from original spec):* the key would live in the same Vercel env as `KV_REST_API_TOKEN`, so anyone who could read the key could already read the Redis hash directly — app-layer encryption with a co-located key adds no real protection. Upstash provides TLS in transit + encryption at rest at the platform layer; the secrecy that matters ("A can't see B's pre-reveal dice") is an application-authz property, solved by the gating above.
 - Server-side seed for dice rolls (`crypto.randomInt`), never trust client roll
 - Private hand delivery: client polls `GET /api/hand/[code]` after each roll; server filters by session token and returns only caller's hand
 - Public state (phase / bids / players) via SSE broadcast; **NO private hand data on SSE channel**
