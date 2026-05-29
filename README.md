@@ -1,6 +1,6 @@
 # 大话骰 (Liar's Dice)
 
-A 2-8 player Liar's Dice web app with 3D physics dice, gyroscope shake-to-roll, per-theme audio, and 4 switchable themes. Mobile-first, realtime, server-authoritative.
+A 2-8 player Liar's Dice web app with animated 2D dice, gyroscope shake-to-roll, per-theme audio, and 4 switchable themes. Mobile-first, realtime, server-authoritative.
 
 <p align="center">
   <img src="docs/screenshots/home-iphone14.png" alt="Home — Modern Minimal theme" width="300" />
@@ -13,7 +13,7 @@ A 2-8 player Liar's Dice web app with 3D physics dice, gyroscope shake-to-roll, 
 
 ## Features
 
-- 🎲 **3D physics dice** — `react-three-fiber@9` + `@react-three/rapier@2` Rapier physics, `onContactForce` audio coupling, `onSleep` quaternion face detection. Each theme renders a distinct material (frosted glass / ivory / lacquered enamel / matte ceramic) via `meshPhysicalMaterial` + a local Lightformer environment — no external HDR fetch.
+- 🎲 **Animated 2D dice** — a lightweight DOM/CSS renderer (`components/dice/Dice2D`) shows your own hand and tumbles on each roll (GPU `transform`/`opacity` only, reduced-motion aware), themed directly via CSS `oklch()` tokens — no WebGL/Three.js. The roll is always server-authoritative (`crypto.randomInt`); the animation is decorative.
 - 📱 **Mobile-first** with gyroscope shake-to-roll (DeviceMotion API, iOS permission flow), `100dvh` safe-area layout, native share-sheet invite links.
 - 🎨 **4 switchable themes** — modern-minimal / classic-bar / hk-neon / cartoon, each with distinct `oklch()` color tokens, display fonts, dice + cup materials, and motion language (no shared "AI slop" defaults).
 - 🧑‍🤝‍🧑 **Player avatars** — pick from 12 glyphs or a numbered seat badge in the lobby; rendered as per-player tinted badges across lobby, turn ring, and reveal.
@@ -36,12 +36,12 @@ pnpm dev
 ## Test
 
 ```bash
-pnpm test            # 76 unit + integration tests (game engine, validation, round resolution)
+pnpm test            # 69 unit + integration tests (game engine, validation, round resolution)
 pnpm test:coverage   # vitest + @vitest/coverage-v8
 pnpm e2e             # Playwright: happy-path, reconnect, extensions, axe a11y — chromium + webkit (mobile Safari)
 ```
 
-The e2e suite (14 tests across 2 projects) drives two browser contexts through create → join → start → bid → challenge → reveal, a 通杀 (sweep) extension journey, a mid-game reload re-sync, and `@axe-core` WCAG A/AA scans of the home / lobby / bidding screens. It reuses a running `pnpm dev` (or starts one). First run needs the browsers: `pnpm exec playwright install chromium webkit`.
+The e2e suite (16 tests across 2 projects) drives two browser contexts through create → join → start → bid → counter-bid → challenge → reveal → next round (incl. asserting each player sees their own dice), a 通杀 (sweep) extension journey, a mid-game reload re-sync, and `@axe-core` WCAG A/AA scans of the home / lobby / bidding screens. It reuses a running `pnpm dev` (or starts one). First run needs the browsers: `pnpm exec playwright install chromium webkit`.
 
 ## Deploy
 
@@ -58,4 +58,4 @@ vercel --prod --scope panpanmao   # personal scope — never the computelabs tea
 
 ## Tech stack
 
-Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS v4 · next-intl · zod · @upstash/redis · @react-three/fiber 9 · @react-three/rapier 2 · @react-three/drei · howler · Biome v2 · Vitest · Playwright + @axe-core/playwright
+Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS v4 · next-intl · zod · @upstash/redis · howler · Biome v2 · Vitest · Playwright + @axe-core/playwright
