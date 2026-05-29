@@ -30,7 +30,7 @@ export function BidPanel({
   const { tokens } = useTheme();
   const rules: GameRules = state.rules;
   const palifico = state.palificoActive ?? false;
-  const chain = state.bidChain ?? [];
+  const chain = Array.isArray(state.bidChain) ? state.bidChain : [];
   const meId = state.players[state.currentTurnIdx]?.id ?? null;
   const standingOwner = chain.length ? chain[chain.length - 1].playerId : null;
 

@@ -293,6 +293,34 @@ describe('prepareNextRound + Palifico', () => {
     expect((r.state?.palificoTriggered ?? []).slice().sort()).toEqual(['p1', 'p3']); // both marked
   });
 
+  it('Palifico after a 通杀 sweep — a swept 1-die loser opens (loserIds, not loserId)', () => {
+    const s = makeState({
+      phase: 'reveal',
+      players: [
+        { id: 'p1', nick: 'A', avatar: 'numeric', diceLeft: 5, alive: true }, // 通杀er, safe
+        { id: 'p2', nick: 'B', avatar: 'numeric', diceLeft: 1, alive: true }, // swept to 1
+        { id: 'p3', nick: 'C', avatar: 'numeric', diceLeft: 1, alive: true }, // swept to 1
+      ],
+      lastChallengeResult: {
+        kind: 'tongsha',
+        actualCount: 0,
+        verifiedBid: { count: 9, face: 4, isZhai: false },
+        bidderIdx: 1,
+        loserIdx: 1,
+        loserId: 'p2',
+        loserIds: ['p2', 'p3'],
+        diceLost: 1,
+        actualMeetsBid: false,
+        gameEnded: false,
+        winnerIdx: -1,
+      },
+    });
+    const r = prepareNextRound(s);
+    expect(r.state?.palificoActive).toBe(true);
+    expect(['p2', 'p3']).toContain(r.state?.palificoBidderId); // a swept 1-die loser, never the safe p1
+    expect((r.state?.palificoTriggered ?? []).slice().sort()).toEqual(['p2', 'p3']);
+  });
+
   it('Palifico is one-shot — an already-triggered 1-die player does not re-trigger', () => {
     const s = makeState({
       phase: 'reveal',

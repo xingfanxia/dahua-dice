@@ -159,6 +159,9 @@ export function resolveChallenge(
  * 劈 (Split / 跳杀) — skip your predecessor and challenge a SPECIFIC non-adjacent
  * player's bid from the round chain. If that bid is false → the target loses a die;
  * if true → the splitter loses a die (2 dice when 反劈 is enabled — the bite-back).
+ *
+ * Played on YOUR turn (in-turn variant), not as an out-of-turn interrupt — a
+ * deliberate simplification of the table rule, pinned in spec §10B.
  */
 export function resolvePi(
   state: RoomState,
@@ -287,10 +290,11 @@ export function prepareNextRound(state: RoomState): {
   let openerIdx: number;
 
   if (state.rules.paliFicoVariant && freshOnes.length > 0) {
-    // The player who just dropped to 1 die opens (research §3.4 "他永远先叫"). If
-    // several dropped at once, prefer the round loser, else lowest seat. Mark every
-    // current 1-die player so each only ever triggers Palifico once.
-    const opener = freshOnes.find((p) => p.id === res.loserId) ?? freshOnes[0];
+    // The player who just dropped to 1 die opens (research §3.4 "他永远先叫"). Prefer
+    // a freshly-1-die player among this round's losers (loserIds covers 通杀 sweeps,
+    // where loserId may be a multi-die player); else lowest seat. Mark every current
+    // 1-die player so each only ever triggers Palifico once.
+    const opener = freshOnes.find((p) => res.loserIds.includes(p.id)) ?? freshOnes[0];
     palificoActive = true;
     palificoBidderId = opener.id;
     openerIdx = idxOf(state, opener.id);

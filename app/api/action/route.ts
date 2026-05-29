@@ -276,31 +276,17 @@ export async function POST(req: NextRequest) {
     }
 
     case 'updateRules': {
-      const state = await redis.get<RoomState>(stateKey);
-      if (!state) return NextResponse.json({ ok: false, reason: 'no_room' }, { status: 404 });
-      if (state.ownerId !== session.playerId) {
-        return NextResponse.json({ ok: false, reason: 'not_owner' }, { status: 403 });
-      }
-      if (state.phase !== 'lobby') {
-        return NextResponse.json({ ok: false, reason: 'wrong_phase' }, { status: 400 });
-      }
-      // body.rules is schema-validated (diceCount 3-7, diceSides 6|8, factor 1-3,
-      // unknown keys stripped) — safe to persist verbatim.
-      const updated: RoomState = {
-        ...state,
-        rules: body.rules,
-        players: state.players.map((p) => ({ ...p, diceLeft: body.rules.diceCount })),
-        version: state.version + 1,
-      };
-      await redis.set(stateKey, updated, { ex: 1800 });
-      const payload = JSON.stringify({
-        type: 'rules_updated',
-        payload: { rules: body.rules },
-        version: updated.version,
+      // Atomic version-CAS in Lua so a concurrent join/leave/avatar can't be
+      // clobbered by a stale read-modify-write. body.rules is Zod-validated
+      // (diceCount 3-7, diceSides 6|8, factor 1-3, unknown keys stripped).
+      const result = await runScript(
+        'updateRules',
+        [stateKey],
+        [session.playerId, JSON.stringify(body.rules)],
+      );
+      return NextResponse.json(result, {
+        status: result.ok ? 200 : statusForReason(result.reason),
       });
-      await redis.xadd(`room:${code}:events`, '*', { data: payload });
-      await redis.publish(`room:${code}:events`, payload);
-      return NextResponse.json({ ok: true, version: updated.version });
     }
 
     default:

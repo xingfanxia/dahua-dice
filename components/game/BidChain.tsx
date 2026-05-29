@@ -15,7 +15,8 @@ function bidLabel(bid: Bid, count: string, face: string, zhai: string): string {
 export function BidChain({ state }: { state: RoomState }) {
   const t = useTranslations();
   const { tokens } = useTheme();
-  const chain = state.bidChain ?? [];
+  // Array.isArray (not ?? []): a cjson-encoded empty table arrives as {} not [].
+  const chain = Array.isArray(state.bidChain) ? state.bidChain : [];
 
   if (chain.length === 0) {
     return (

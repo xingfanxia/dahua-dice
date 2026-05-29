@@ -295,6 +295,32 @@ redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
 return cjson.encode({ok=true, version=state.version})
 `;
 
+// updateRules: owner-only, lobby-only rules change. The whole GET-modify-SET runs
+// in one atomic eval, so it operates on the CURRENT roster — a concurrent join /
+// leave / avatar can't be clobbered (the previous Node read-modify-write could).
+// No version CAS needed (and CAS would wrongly reject an owner whose client hasn't
+// yet synced a join).
+export const updateRules = `
+local stateKey = KEYS[1]
+local playerId = ARGV[1]
+local rules = cjson.decode(ARGV[2])
+local raw = redis.call('GET', stateKey)
+if not raw then return cjson.encode({ok=false, reason='no_room'}) end
+local state = cjson.decode(raw)
+if state.ownerId ~= playerId then return cjson.encode({ok=false, reason='not_owner'}) end
+if state.phase ~= 'lobby' then return cjson.encode({ok=false, reason='wrong_phase'}) end
+state.rules = rules
+for i = 1, #state.players do
+  state.players[i].diceLeft = rules.diceCount
+end
+state.version = state.version + 1
+redis.call('SET', stateKey, cjson.encode(state), 'EX', 1800)
+local payload = cjson.encode({type='rules_updated', payload={}, version=state.version})
+redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', payload)
+redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
+return cjson.encode({ok=true, version=state.version})
+`;
+
 // rematch: owner-only reset of a finished game back to the lobby with the same
 // players. (Empty {}/array fields are coerced by normalizeState on the next read.)
 export const rematch = `

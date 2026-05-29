@@ -473,7 +473,11 @@ rules. Semantics (derived from research §3.6 / §3.4, pinned here as the contra
 - **Palifico** `paliFicoVariant`: the first time a player drops to exactly 1 die,
   the next round is theirs to open; 1s are not wild; the count is locked to the
   opener and raises are face-only. One-shot per player. If several drop at once,
-  the round loser opens.
+  a freshly-1-die player among the round's losers opens (else lowest seat).
+
+**In-turn variant**: 劈 and 通杀 are played on the actor's own turn (the BidPanel
+only renders then), not as out-of-turn interrupts. This is a deliberate
+simplification of the table rule — keeps turn order + version-CAS simple.
 
 ## 10A. Interaction State Matrix
 

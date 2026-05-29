@@ -39,8 +39,12 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
     unlockAudio();
   }, []);
 
-  // SSE-driven sync: on any room event, refetch the full state
+  // SSE-driven sync: on any room event, refetch the full state. An in-flight guard
+  // collapses bursts (e.g. an SSE reconnect storm) into a single /full read.
+  const refetching = useRef(false);
   const refetch = useCallback(async () => {
+    if (refetching.current) return;
+    refetching.current = true;
     try {
       const res = await fetch(`/api/room/${code}/full`, { cache: 'no-store' });
       if (!res.ok) return;
@@ -48,7 +52,10 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
       if (data.ok && data.state) {
         setState((prev) => (data.state.version > prev.version ? data.state : prev));
       }
-    } catch {}
+    } catch {
+    } finally {
+      refetching.current = false;
+    }
   }, [code]);
 
   const { status: connStatus } = useRoomEvents(code, () => {
