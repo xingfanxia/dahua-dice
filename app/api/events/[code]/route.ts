@@ -30,7 +30,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
       let event: unknown = null;
       try {
         event = JSON.parse(dataStr);
-      } catch {}
+      } catch (err) {
+        // A corrupt stored event must not break the whole reconnect replay,
+        // but it shouldn't vanish silently — surface it so a serialization bug
+        // stays detectable. The bad entry is still returned with event=null.
+        console.warn(`[events] unparseable event ${id} in ${streamKey}:`, err);
+      }
       return { id, event };
     },
   );

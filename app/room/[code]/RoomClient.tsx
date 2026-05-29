@@ -97,7 +97,10 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
       await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {}
+    } catch {
+      // clipboard blocked (perms / insecure context) — best-effort; the invite
+      // link is already on screen, so skipping the "copied" toast is acceptable
+    }
   }
 
   async function handleStart() {
