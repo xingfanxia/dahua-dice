@@ -17,3 +17,6 @@ coverage/
 test-results/
 playwright-report/
 .playwright/
+
+# Next.js auto-generated (rewritten by dev vs build — was churning)
+next-env.d.ts
