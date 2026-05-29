@@ -6,6 +6,14 @@ import { useTheme } from '@/components/theme/ThemeProvider';
 import { getPack } from './howl-instance';
 
 /**
+ * Audio is OFF by default for now — the synthesized SFX aren't good enough to ship.
+ * Set `NEXT_PUBLIC_AUDIO_ENABLED=true` to re-enable (e.g. after real CC0 samples
+ * land). When off, the sprite sheet is never fetched and every helper below no-ops
+ * (howlRef stays null, so each play guard short-circuits).
+ */
+const AUDIO_ENABLED = process.env.NEXT_PUBLIC_AUDIO_ENABLED === 'true';
+
+/**
  * Loads the current theme's audio sprite and exposes coupled playback helpers.
  *
  * - `collide(pairKey, force)`: Rapier onContactForce. Volume ← impact force,
@@ -22,6 +30,7 @@ export function useDiceAudio() {
   const active = useRef<number[]>([]);
 
   useEffect(() => {
+    if (!AUDIO_ENABLED) return; // sound disabled — don't even fetch the sprite sheet
     // Sprite map mirrors scripts/audio/generate-sprites.mjs exactly (5500ms total).
     const pack = getPack({
       url: tokens.audioPackPath.replace(/\.json$/, ''),

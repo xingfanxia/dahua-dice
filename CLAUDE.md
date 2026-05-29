@@ -127,6 +127,8 @@ messages/             # zh-CN.json + en.json (parity-checked)
 
 ## Audio sprites
 
+> **Audio is DISABLED by default** (`AUDIO_ENABLED` in `lib/audio/useDiceAudio.ts`, gated on `NEXT_PUBLIC_AUDIO_ENABLED=true`). The synth SFX aren't good enough to ship yet; when off, the sprite sheet is never fetched and every play helper no-ops. Re-enable by setting the env var (ideally after dropping in real CC0 samples).
+
 Generated via ffmpeg synthesis (no external assets). 4 themes × 2 formats at `public/audio/{modern,classic,hk,cartoon}.{mp3,webm}`. Total ~340KB across all themes.
 
 - **Regenerate**: `node scripts/audio/generate-sprites.mjs`
