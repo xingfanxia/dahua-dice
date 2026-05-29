@@ -8,6 +8,14 @@ import { RoomClient } from './RoomClient';
 
 export const dynamic = 'force-dynamic';
 
+// Explicit per-route title so the document always has a non-empty <title> after
+// client-side navigation (WCAG 2.4.2) — the root layout title doesn't reliably
+// apply across the home → room transition.
+export async function generateMetadata({ params }: { params: Promise<{ code: string }> }) {
+  const { code } = await params;
+  return { title: `${code.toUpperCase()} · 大话骰` };
+}
+
 export default async function RoomPage({ params }: { params: Promise<{ code: string }> }) {
   const { code: rawCode } = await params;
   const code = rawCode.toUpperCase();

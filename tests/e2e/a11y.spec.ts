@@ -4,7 +4,11 @@ import { createRoom, joinViaInvite, startGame } from './helpers';
 
 const TAGS = ['wcag2a', 'wcag2aa'];
 
-function scan(page: Parameters<typeof createRoom>[0]) {
+async function scan(page: Parameters<typeof createRoom>[0]) {
+  // Wait for the <title> to settle — on client-side nav (home → room) it is
+  // briefly empty before the route metadata applies, which would flake the
+  // document-title rule. Then scan.
+  await expect(page).toHaveTitle(/.+/);
   return new AxeBuilder({ page }).withTags(TAGS).analyze();
 }
 

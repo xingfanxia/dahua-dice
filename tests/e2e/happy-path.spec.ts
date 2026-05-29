@@ -46,7 +46,7 @@ test.describe('happy path', () => {
     await bobConfirm.click();
 
     // Reveal stage appears for both players.
-    await expect(alice.getByText(STR.reveal)).toBeVisible({ timeout: 15000 });
-    await expect(bob.getByText(STR.reveal)).toBeVisible({ timeout: 15000 });
+    await expect(alice.getByRole('heading', { name: STR.reveal })).toBeVisible({ timeout: 15000 });
+    await expect(bob.getByRole('heading', { name: STR.reveal })).toBeVisible({ timeout: 15000 });
   });
 });

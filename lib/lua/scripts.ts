@@ -121,10 +121,11 @@ if not turnPlayer or turnPlayer.id ~= playerId then
   return cjson.encode({ok=false, reason='not_your_turn'})
 end
 -- Reset the bid chain when this is the round opener (no standing bid), then append.
+-- NB: lastBid and the chain entry must be SEPARATE tables — Redis cjson.encode
+-- returns nil (→ "redis() args must be strings") if a sub-table is shared.
 if state.lastBid == nil or state.lastBid == cjson.null then state.bidChain = {} end
-local thisBid = { count = count, face = face, isZhai = isZhai }
-state.lastBid = thisBid
-table.insert(state.bidChain, { playerId = playerId, bid = thisBid })
+state.lastBid = { count = count, face = face, isZhai = isZhai }
+table.insert(state.bidChain, { playerId = playerId, bid = { count = count, face = face, isZhai = isZhai } })
 if isZhai then state.isZhaiRound = true end
 local n = #state.players
 local nextIdx = state.currentTurnIdx

@@ -6,6 +6,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
+  // Per-test timeout: the dev server (Turbopack) compiles routes lazily, so the
+  // first full-game flow on the slower WebKit project can exceed the 30s default.
+  timeout: 60 * 1000,
   reporter: 'list',
   use: {
     baseURL: 'http://localhost:3000',

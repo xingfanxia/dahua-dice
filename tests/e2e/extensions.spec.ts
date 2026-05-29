@@ -56,7 +56,7 @@ test.describe('中式扩展 (extensions)', () => {
     await expect(bobTongsha).toBeVisible({ timeout: 15000 });
     await bobTongsha.click();
 
-    await expect(alice.getByText('揭晓!')).toBeVisible({ timeout: 15000 });
-    await expect(bob.getByText('揭晓!')).toBeVisible({ timeout: 15000 });
+    await expect(alice.getByRole('heading', { name: '揭晓!' })).toBeVisible({ timeout: 15000 });
+    await expect(bob.getByRole('heading', { name: '揭晓!' })).toBeVisible({ timeout: 15000 });
   });
 });

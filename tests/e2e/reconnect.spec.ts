@@ -26,7 +26,7 @@ test.describe('reconnect', () => {
 
     // Confirm the game is underway for Bob before reloading: it is Alice's turn,
     // so Bob sees the "Alice 思考中" turn indicator (game view, not lobby).
-    await expect(bob.getByText(/思考中/)).toBeVisible({ timeout: 15000 });
+    await expect(bob.locator('p:not([aria-live])', { hasText: '思考中' })).toBeVisible({ timeout: 15000 });
 
     // Hard reload Bob — the room page is server-rendered from Redis, so the
     // current phase/roster must come back without dropping to the lobby.
@@ -35,7 +35,7 @@ test.describe('reconnect', () => {
     // Still the same room, still in-game, NOT back at the lobby. The turn
     // indicator ("Alice 思考中") proves the live phase + roster came back.
     await expect(bob).toHaveURL(new RegExp(`/room/${code}`));
-    await expect(bob.getByText(/思考中/)).toBeVisible({ timeout: 15000 });
+    await expect(bob.locator('p:not([aria-live])', { hasText: '思考中' })).toBeVisible({ timeout: 15000 });
     await expect(bob.getByRole('button', { name: STR.start })).toHaveCount(0);
 
     // And live sync still works post-reload: Alice bids, Bob sees it's his turn

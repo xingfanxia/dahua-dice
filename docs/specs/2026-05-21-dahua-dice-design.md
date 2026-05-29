@@ -449,8 +449,31 @@ function applyChineseExtension(action: ChineseExtAction, state: GameState): Game
 - 起叫数 = `ceil(rules.startingBidFactor × alivePlayers)`，斋叫为 `alivePlayers`
 - 加叫合法性：`count > prev.count` OR (`count === prev.count && face > prev.face`)
 - 斋后破斋（飞）：`next.count >= prev.count × 2`
-- 1 点万能：非斋叫时算 `face` + `1` 点，斋叫时只算 `face`
-- 中式扩展（劈/反劈/通杀）：每个 toggle 一个 `applyChineseExtension(action, state)` 实现
+- 进入斋（中途转斋）：只需满足普通加叫规则（research §2.3），NO halve-pool 限制
+- 叫1必斋：`face === 1` 必须为斋叫（research §2.3）
+- 1 点万能：非斋叫且非 Palifico 时算 `face` + `1` 点，斋叫/Palifico 时只算 `face`
+- 防作弊：叫数不得超过场上骰子总数
+
+### 10B. 中式扩展 + Palifico — pinned semantics
+
+Implemented in `lib/game-engine/round.ts` (pure, unit-tested) and run by the API
+route in Node, committed atomically via a thin version-CAS Lua (`commitState` /
+`commitRound`). There is **no** separate untested Lua re-implementation of the
+rules. Semantics (derived from research §3.6 / §3.4, pinned here as the contract):
+
+- **开 (Dudo)**: challenge the standing bid (last `bidChain` entry). actual ≥ count
+  → challenger loses 1 die; actual < count → bidder loses 1.
+- **劈 (Pi / 跳杀)** `chineseExtensions.pi`: skip the predecessor and challenge a
+  *non-adjacent* chain bidder's bid. That bid false → target loses 1; true →
+  splitter loses 1.
+- **反劈 (Fanpi)** `chineseExtensions.fanpi` (depends on pi): a failed 劈 (target's
+  bid held) escalates the splitter's loss to 2 dice — the "bite back".
+- **通杀 (Tongsha / 连开)** `chineseExtensions.tongsha`: challenge the standing bid;
+  false → every other chain bidder loses 1 (sweep); true → the 通杀er loses 2.
+- **Palifico** `paliFicoVariant`: the first time a player drops to exactly 1 die,
+  the next round is theirs to open; 1s are not wild; the count is locked to the
+  opener and raises are face-only. One-shot per player. If several drop at once,
+  the round loser opens.
 
 ## 10A. Interaction State Matrix
 

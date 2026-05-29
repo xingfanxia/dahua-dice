@@ -32,7 +32,12 @@ export function useRoomEvents(
       es?.close();
       setStatus('connecting');
       es = new EventSource(`/api/stream/${code}`);
-      es.onopen = () => setStatus('open');
+      es.onopen = () => {
+        setStatus('open');
+        // Refetch on (re)connect to catch any events missed before the stream was
+        // live — e.g. a player who joined in the window before our SSE attached.
+        onEventRef.current({ type: 'sync', payload: null, version: 0 });
+      };
       es.onmessage = (msg) => {
         // Upstash REST /subscribe SSE format is:
         //   "subscribe,<channel>,<refcount>"   — initial ack, ignore
