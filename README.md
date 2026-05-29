@@ -36,7 +36,7 @@ pnpm dev
 ## Test
 
 ```bash
-pnpm test            # 68 unit + integration tests (game engine, validation, round resolution)
+pnpm test            # 69 unit + integration tests (game engine, validation, round resolution)
 pnpm test:coverage   # vitest + @vitest/coverage-v8
 pnpm e2e             # Playwright: happy-path, reconnect, extensions, axe a11y — chromium + webkit (mobile Safari)
 ```
@@ -58,4 +58,4 @@ vercel --prod --scope panpanmao   # personal scope — never the computelabs tea
 
 ## Tech stack
 
-Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS v4 · Zustand · next-intl · zod · @upstash/redis · @react-three/fiber 9 · @react-three/rapier 2 · @react-three/drei · howler · Biome v2 · Vitest · Playwright + @axe-core/playwright
+Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS v4 · next-intl · zod · @upstash/redis · @react-three/fiber 9 · @react-three/rapier 2 · @react-three/drei · howler · Biome v2 · Vitest · Playwright + @axe-core/playwright

@@ -31,17 +31,17 @@
 | 3D | `@react-three/fiber@9.5` + `@react-three/rapier@2.2` |
 | Audio | `howler` v2 — 8-slice ffmpeg-synth sprites (collide/shake/reveal/win/lose/click/settle/stinger), 4 themes |
 | i18n | `next-intl` (zh-CN default + en, parity-checked) |
-| UI | Tailwind v4 + Zustand-style local state (no external state lib yet) |
+| UI | Tailwind v4 + React local state (no external state lib) |
 | Validation | Zod at API boundaries (`lib/validation/schemas.ts`) + Redis INCR rate limiter (`lib/rate-limit.ts`) |
 | Lint | Biome v2 (replaces ESLint + Prettier; CSS formatter disabled — Tailwind v4 syntax incompatible) |
-| Test | Vitest (68 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / axe a11y; 14 tests, chromium + webkit) |
+| Test | Vitest (69 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / axe a11y; 14 tests, chromium + webkit) |
 
 ## Commands
 
 ```bash
 pnpm dev            # http://localhost:3000
 pnpm build          # production build (~1.5-2s)
-pnpm test           # 68 unit + integration tests
+pnpm test           # 69 unit + integration tests
 pnpm e2e            # Playwright e2e (needs pnpm dev or auto-starts one); browsers: playwright install chromium webkit
 pnpm lint:fix       # Biome autofix
 vercel env pull .env.local --environment=production   # canonical env (Upstash vars live in Production scope)
@@ -96,7 +96,7 @@ Pure, unit-tested functions in `lib/game-engine/`:
 
 Pinned 中式扩展 / Palifico semantics: see design spec §10/§10B. `lib/room/resolution.ts` = `readHands` (tolerant parse) + `normalizeState` (coerce cjson-`{}` arrays) + `GAME_TTL`. Boundary validation via Zod (`lib/validation/schemas.ts`); rate limit via `lib/rate-limit.ts` (30/min action, 15/min room).
 
-All unit-tested (68 unit + integration, full game simulated end-to-end via `round.ts`). Live path covered by Playwright e2e incl. a 通杀 journey.
+All unit-tested (69 unit + integration, full game simulated end-to-end via `round.ts`). Live path covered by Playwright e2e incl. a 通杀 journey.
 
 ## File layout
 
@@ -120,7 +120,7 @@ lib/
 ├── audio/            # howl-instance + useDiceAudio
 ├── rate-limit.ts     # Redis INCR fixed-window limiter
 └── redis.ts          # Upstash client + REST URL/token exports
-tests/                # unit + integration (68) + e2e/ (14 Playwright, chromium + webkit)
+tests/                # unit + integration (69) + e2e/ (14 Playwright, chromium + webkit)
 docs/                 # specs / plans / research (all written before code)
 messages/             # zh-CN.json + en.json (parity-checked)
 ```
