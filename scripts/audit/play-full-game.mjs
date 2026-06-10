@@ -22,8 +22,7 @@ function wireDiagnostics(page, who) {
     // /api/hand is intentionally aborted on a round change (the client's stale-hand
     // guard calls AbortController.abort() so a slow prior-round hand can't overwrite
     // the new round). Fast automated play trips this every round — it's not a bug.
-    if (req.url().includes('/api/hand/') && req.failure()?.errorText === 'net::ERR_ABORTED')
-      return;
+    if (req.url().includes('/api/hand/') && req.failure()?.errorText === 'net::ERR_ABORTED') return;
     issues.push(`[${who}][requestfailed] ${req.method()} ${req.url()} ${req.failure()?.errorText}`);
   });
   page.on('response', (res) => {

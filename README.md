@@ -36,7 +36,7 @@ pnpm dev
 ## Test
 
 ```bash
-pnpm test            # 73 unit + integration tests (game engine, validation, round resolution)
+pnpm test            # 79 unit + integration tests (game engine, validation, round resolution)
 pnpm test:coverage   # vitest + @vitest/coverage-v8
 pnpm e2e             # Playwright: happy-path, reconnect, extensions, solo, axe a11y — chromium + webkit (mobile Safari)
 PLAYWRIGHT_PORT=3100 pnpm e2e   # use a free port if :3000 is taken by another dev server

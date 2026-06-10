@@ -34,14 +34,14 @@
 | UI | Tailwind v4 + React local state (no external state lib) |
 | Validation | Zod at API boundaries (`lib/validation/schemas.ts`) + Redis INCR rate limiter (`lib/rate-limit.ts`; 30/min action · 15/min room · 20/min session, all per-IP/session; `RATE_LIMIT_DISABLED=1` opt-out for e2e only) |
 | Lint | Biome v2 (replaces ESLint + Prettier; CSS formatter disabled — Tailwind v4 syntax incompatible) |
-| Test | Vitest (73 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / full-game-to-rematch / solo / axe a11y; 24 tests, chromium + webkit) |
+| Test | Vitest (79 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / full-game-to-rematch / solo / axe a11y; 24 tests, chromium + webkit) |
 
 ## Commands
 
 ```bash
 pnpm dev            # http://localhost:3000
 pnpm build          # production build (~1.5-2s)
-pnpm test           # 73 unit + integration tests
+pnpm test           # 79 unit + integration tests
 pnpm e2e            # Playwright e2e (auto-starts a dev server); browsers: playwright install chromium webkit
 PLAYWRIGHT_PORT=3100 pnpm e2e   # use when :3000 is taken by another project's dev server (reuseExistingServer would grab it)
 pnpm lint:fix       # Biome autofix
@@ -147,7 +147,7 @@ Remaining (need a human / physical device — can't be done from a dev session):
 
 1. **Real-device gyro test** — need iPhone 14 Pro + Pixel 7 / Android for DeviceMotion validation on hardware
 
-Done (2026-06-10 — round-2 audit + solo mode; branch `fix/playability-audit-r2-2026-06-09`, 73 unit + 24 e2e green ×2):
+Done (2026-06-10 — round-2 audit + solo mode; branch `fix/playability-audit-r2-2026-06-09`, 79 unit + 24 e2e green ×2):
 
 - **New feature — offline / solo dice-cup mode** (`/solo`): each phone is a fair local dice cup for playing 大话骰 face-to-face (players call bids out loud; app just rolls + shows your own hand). No room/server/network. Reuses Dice2D + themes + shake-to-roll + audio; cover/peek toggle; dice-count (1–8) + 6/8-sides; `lib/solo/roll.ts` uses `crypto.getRandomValues` (local rolls are fine — solo has no protocol adversary, unlike the multiplayer game). Home-page entry link.
 - **16 confirmed bugs** from a multi-agent audit (6 dimension finders + adversarial verify):
