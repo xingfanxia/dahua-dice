@@ -16,9 +16,14 @@ function wireDiagnostics(page, who) {
     }
   });
   page.on('pageerror', (err) => issues.push(`[${who}][pageerror] ${err.message}`));
-  page.on('requestfailed', (req) =>
-    issues.push(`[${who}][requestfailed] ${req.method()} ${req.url()} ${req.failure()?.errorText}`),
-  );
+  page.on('requestfailed', (req) => {
+    // SSE close on nav + intentional /api/hand abort on round change (stale-hand
+    // guard) are expected noise, not bugs.
+    if (req.url().includes('/api/stream/')) return;
+    if (req.url().includes('/api/hand/') && req.failure()?.errorText === 'net::ERR_ABORTED')
+      return;
+    issues.push(`[${who}][requestfailed] ${req.method()} ${req.url()} ${req.failure()?.errorText}`);
+  });
   page.on('response', (res) => {
     if (res.status() >= 400 && !res.url().includes('_next/')) {
       issues.push(`[${who}][http ${res.status()}] ${res.request().method()} ${res.url()}`);
