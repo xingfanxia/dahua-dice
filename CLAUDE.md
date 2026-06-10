@@ -63,7 +63,7 @@ vercel --prod --scope panpanmao   # deploy
 | POST | `/api/action` | Universal action — Zod-validated discriminated union: join / start / bid / challenge / **pi** / **tongsha** / nextRound / leave / setAvatar / updateRules / **rematch**. Rate-limited 30/min/session |
 | GET | `/api/hand/[code]` | Authenticated: caller's private dice only |
 | GET | `/api/stream/[code]` | SSE pipe to Upstash subscribe channel |
-| GET | `/api/events/[code]?since=ID` | Redis Stream replay for reconnect catchup |
+| GET | `/api/events/[code]?since=ID` | Redis Stream since-ID replay — **present but NOT wired** (no caller anywhere); client reconnects via `/full` refetch on SSE `onopen` + 3s poll. Kept for a future incremental-catchup upgrade |
 | POST | `/api/session` | Bootstrap or refresh anonymous session |
 | GET | `/api/whoami` | Read session — playerId / nick / currentRoom |
 | GET | `/api/health` | Health check `{ok:true}` |
