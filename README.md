@@ -38,11 +38,11 @@ pnpm dev
 ```bash
 pnpm test            # 79 unit + integration tests (game engine, validation, round resolution)
 pnpm test:coverage   # vitest + @vitest/coverage-v8
-pnpm e2e             # Playwright: happy-path, reconnect, extensions, solo, axe a11y — chromium + webkit (mobile Safari)
+pnpm e2e             # Playwright: happy-path, reconnect, extensions, solo, palifico, axe a11y — chromium + webkit (mobile Safari)
 PLAYWRIGHT_PORT=3100 pnpm e2e   # use a free port if :3000 is taken by another dev server
 ```
 
-The e2e suite (24 tests across 2 projects) drives two browser contexts through create → join → start → bid → counter-bid → challenge → reveal → next round (incl. asserting each player sees their own dice), a **complete game to elimination → final results → rematch → lobby**, a 通杀 (sweep) extension journey, a mid-game reload re-sync, the **offline / solo dice-cup** flow (roll · cover/peek · dice-count), and `@axe-core` WCAG A/AA scans of the home / lobby / bidding / solo screens. It auto-starts a dev server (override the port with `PLAYWRIGHT_PORT`). First run needs the browsers: `pnpm exec playwright install chromium webkit`.
+The e2e suite (26 tests across 2 projects) drives two browser contexts through create → join → start → bid → counter-bid → challenge → reveal → next round (incl. asserting each player sees their own dice), a **complete game to elimination → final results → rematch → lobby**, a 通杀 (sweep) extension journey, a mid-game reload re-sync, the **offline / solo dice-cup** flow (roll · cover/peek · dice-count), and `@axe-core` WCAG A/AA scans of the home / lobby / bidding / solo screens. It auto-starts a dev server (override the port with `PLAYWRIGHT_PORT`). First run needs the browsers: `pnpm exec playwright install chromium webkit`.
 
 ## Deploy
 
