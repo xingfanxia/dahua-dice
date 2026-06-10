@@ -32,6 +32,7 @@ export function CustomizationDrawer({
   const t = useTranslations();
   const { tokens } = useTheme();
   const [diceCount, setDiceCount] = useState<3 | 4 | 5 | 6 | 7>(rules.diceCount);
+  const [diceSides, setDiceSides] = useState<6 | 8>(rules.diceSides);
   const [aceWild, setAceWild] = useState(rules.aceWild);
   const [allowZhai, setAllowZhai] = useState(rules.allowZhai);
   const [chineseExt, setChineseExt] = useState(rules.chineseExtensions);
@@ -45,6 +46,7 @@ export function CustomizationDrawer({
   useEffect(() => {
     if (!open) return;
     setDiceCount(rules.diceCount);
+    setDiceSides(rules.diceSides);
     setAceWild(rules.aceWild);
     setAllowZhai(rules.allowZhai);
     setChineseExt(rules.chineseExtensions);
@@ -68,6 +70,7 @@ export function CustomizationDrawer({
     onSaveRules({
       ...rules,
       diceCount,
+      diceSides,
       aceWild,
       allowZhai,
       chineseExtensions: chineseExt,
@@ -175,6 +178,31 @@ export function CustomizationDrawer({
                 >
                   +
                 </button>
+              </div>
+            </section>
+
+            {/* Dice sides (6 / 8) — mirrors the solo page selector; the engine,
+                schema and BidPanel already support the 8-sided variant. */}
+            <section className="flex items-center justify-between">
+              <span>{t('customization.diceSides')}</span>
+              <div className="flex gap-2">
+                {([6, 8] as const).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setDiceSides(s)}
+                    className="min-w-[44px] h-11 rounded-xl text-lg num transition-colors"
+                    aria-pressed={diceSides === s}
+                    aria-label={`${s}`}
+                    style={{
+                      backgroundColor:
+                        diceSides === s ? tokens.colors.primary : tokens.colors.surface,
+                      color: diceSides === s ? tokens.colors.bg : tokens.colors.text,
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
             </section>
 
