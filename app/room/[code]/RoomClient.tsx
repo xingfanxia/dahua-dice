@@ -845,13 +845,16 @@ function GameView({
                 {t('game.rematch')}
               </button>
             )}
+            {/* Honest label: this action just leaves to home (the leaveRoom Lua
+                transfers ownership to a remaining player), it does not dissolve
+                the room — so don't promise "disband" (esp. to non-owners). */}
             <button
               type="button"
               onClick={leaveGame}
               className="flex-1 py-3 min-h-[44px] rounded-2xl font-medium"
               style={{ backgroundColor: tokens.colors.surface, color: tokens.colors.textMuted }}
             >
-              {t('game.disband')}
+              {t('lobby.leaveRoom')}
             </button>
           </div>
         </div>
