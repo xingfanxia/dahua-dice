@@ -44,7 +44,63 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
     return new Response(`upstash_subscribe_failed:${upstreamResponse.status}`, { status: 502 });
   }
 
-  return new Response(upstreamResponse.body, {
+  // Managed pump instead of a raw body pipe. The raw pipe had two failure modes:
+  // (1) undici's 300s body-inactivity timeout killed idle subscriptions with a loud
+  //     "failed to pipe response / BodyTimeoutError"; (2) zero keepalives meant
+  //     mobile networks / proxies could silently drop the idle connection. We send
+  //     `: ping` comment frames every 20s, close gracefully BEFORE the undici /
+  //     maxDuration deadlines, and collapse upstream errors into a clean close —
+  //     the browser EventSource auto-reconnects either way.
+  const upstream = upstreamResponse.body.getReader();
+  const encoder = new TextEncoder();
+  const PING_MS = 20_000;
+  const DEADLINE_MS = 280_000; // < maxDuration (300s) and < undici bodyTimeout (300s)
+
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      let closed = false;
+      let ping: ReturnType<typeof setInterval> | undefined;
+      let deadline: ReturnType<typeof setTimeout> | undefined;
+      const close = () => {
+        if (closed) return;
+        closed = true;
+        if (ping) clearInterval(ping);
+        if (deadline) clearTimeout(deadline);
+        upstream.cancel().catch(() => {});
+        try {
+          controller.close();
+        } catch {
+          // controller already errored/closed — nothing to release
+        }
+      };
+      ping = setInterval(() => {
+        try {
+          controller.enqueue(encoder.encode(': ping\n\n'));
+        } catch {
+          close();
+        }
+      }, PING_MS);
+      deadline = setTimeout(close, DEADLINE_MS);
+      (async () => {
+        try {
+          while (true) {
+            const { done, value } = await upstream.read();
+            if (done) break;
+            controller.enqueue(value);
+          }
+        } catch {
+          // upstream died (idle timeout / network) — close cleanly, client reconnects
+        }
+        close();
+      })();
+    },
+    cancel() {
+      // browser disconnected
+      upstream.cancel().catch(() => {});
+    },
+  });
+
+  return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
