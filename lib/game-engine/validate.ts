@@ -6,8 +6,14 @@ export function getStartingBidThreshold(
   alivePlayers: number,
   isZhai: boolean,
   rules: GameRules,
+  /** Dice physically on the table. The floor must never exceed it — late-game
+   * attrition (e.g. 1v1 with one die each) would otherwise leave the round
+   * opener with NO legal bid (floor 3 > table 2) and no challenge either
+   * (nothing to challenge yet): a hard softlock. */
+  totalDice?: number,
 ): number {
-  return isZhai ? alivePlayers : Math.ceil(rules.startingBidFactor * alivePlayers);
+  const floor = isZhai ? alivePlayers : Math.ceil(rules.startingBidFactor * alivePlayers);
+  return totalDice != null ? Math.max(1, Math.min(floor, totalDice)) : floor;
 }
 
 export function isValidBid(
@@ -45,7 +51,7 @@ export function isValidBid(
   if (next.face === 1 && !next.isZhai) return { ok: false, reason: 'face_one_must_zhai' };
 
   if (!prev) {
-    const threshold = getStartingBidThreshold(alivePlayers, next.isZhai, rules);
+    const threshold = getStartingBidThreshold(alivePlayers, next.isZhai, rules, opts?.totalDice);
     if (next.count < threshold) return { ok: false, reason: 'below_starting' };
     return { ok: true };
   }

@@ -14,6 +14,43 @@ describe('getStartingBidThreshold', () => {
     expect(getStartingBidThreshold(2, true, DEFAULT_RULES)).toBe(2);
     expect(getStartingBidThreshold(5, true, DEFAULT_RULES)).toBe(5);
   });
+
+  it('clamps to total table dice (late-game 1v1 must keep a legal opener)', () => {
+    // 2 alive with 1 die each: floor would be 3 > table 2 → clamp to 2
+    expect(getStartingBidThreshold(2, false, DEFAULT_RULES, 2)).toBe(2);
+    // 3 alive all at 1 die: floor 5 > table 3 → clamp to 3
+    expect(getStartingBidThreshold(3, false, DEFAULT_RULES, 3)).toBe(3);
+    // plenty of dice → unclamped
+    expect(getStartingBidThreshold(2, false, DEFAULT_RULES, 10)).toBe(3);
+  });
+});
+
+describe('isValidBid (late-game opener paralysis regression)', () => {
+  // THE softlock: 1v1 with one die each — ceil(1.5×2)=3 demanded but only 2 dice
+  // exist; with no standing bid there is nothing to challenge either, so the
+  // opener used to have ZERO legal actions and the game froze.
+  it('1v1 with 1 die each: opening 2×face is legal', () => {
+    expect(
+      isValidBid(null, { count: 2, face: 4, isZhai: false }, DEFAULT_RULES, 2, { totalDice: 2 }).ok,
+    ).toBe(true);
+  });
+
+  it('1v1 with 1 die each: opening 1×face is still below the (clamped) floor', () => {
+    const r = isValidBid(null, { count: 1, face: 4, isZhai: false }, DEFAULT_RULES, 2, {
+      totalDice: 2,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('below_starting');
+  });
+
+  it('uneven 1v1 (1 vs 5 dice, table 6): floor stays unclamped at 3', () => {
+    expect(
+      isValidBid(null, { count: 2, face: 4, isZhai: false }, DEFAULT_RULES, 2, { totalDice: 6 }).ok,
+    ).toBe(false);
+    expect(
+      isValidBid(null, { count: 3, face: 4, isZhai: false }, DEFAULT_RULES, 2, { totalDice: 6 }).ok,
+    ).toBe(true);
+  });
 });
 
 describe('isValidBid (no prior bid)', () => {

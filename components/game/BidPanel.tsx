@@ -47,11 +47,12 @@ export function BidPanel({
     !!state.lastBid &&
     [...new Set(chain.map((e) => e.playerId))].some((id) => id !== meId);
 
+  const totalDice = state.players.reduce((s, p) => s + (p.alive ? p.diceLeft : 0), 0);
   const initialCount = palifico
     ? (state.lastBid?.count ?? alivePlayers)
     : state.lastBid
       ? state.lastBid.count + 1
-      : Math.ceil(rules.startingBidFactor * alivePlayers);
+      : getStartingBidThreshold(alivePlayers, false, rules, totalDice);
   const initialFace: Face = state.lastBid?.face ?? 4;
   const [count, setCount] = useState(initialCount);
   const [face, setFace] = useState<Face>(initialFace);
@@ -62,7 +63,6 @@ export function BidPanel({
   const countLocked = palifico && !!state.lastBid; // Palifico locks the count to the opener's
 
   const candidate: Bid = useMemo(() => ({ count, face, isZhai }), [count, face, isZhai]);
-  const totalDice = state.players.reduce((s, p) => s + (p.alive ? p.diceLeft : 0), 0);
   const validation = isValidBid(state.lastBid, candidate, rules, alivePlayers, {
     totalDice,
     palifico,
@@ -392,7 +392,7 @@ export function BidPanel({
                 return t('errors.countExceedsDice');
               case 'below_starting':
                 return t('errors.belowStarting', {
-                  min: getStartingBidThreshold(alivePlayers, isZhai, rules),
+                  min: getStartingBidThreshold(alivePlayers, isZhai, rules, totalDice),
                 });
               case 'break_zhai_needs_2x':
                 return t('errors.breakZhaiNeeds2x');
