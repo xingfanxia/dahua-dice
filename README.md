@@ -18,6 +18,7 @@ A 2-8 player Liar's Dice web app with animated 2D dice, gyroscope shake-to-roll,
 - 🧑‍🤝‍🧑 **Player avatars** — pick from 12 glyphs or a numbered seat badge in the lobby; rendered as per-player tinted badges across lobby, turn ring, and reveal.
 - 🌐 **i18n** — zh-CN default + en, via `next-intl`.
 - 🔄 **Realtime multiplayer** via Upstash Redis + Vercel Fluid Compute SSE pipe (`/subscribe/{channel}` transparent stream), with Redis Stream (`XRANGE`) replay for reconnect catch-up.
+- 🎲 **Offline / solo mode** (`/solo`) — for playing face-to-face, each phone is a fair local dice cup: roll (button or shake), see your own hand, cover/peek to hide it across the table; no room, no network. Rolls use `crypto.getRandomValues` locally (solo has no protocol adversary, unlike the server-authoritative multiplayer game).
 - 🔒 **Server-authoritative gameplay** — challenge / 劈 / 通杀 / round resolution runs in a **pure, unit-tested engine** (`lib/game-engine/round.ts`) computed in Node, then committed atomically via version-CAS Lua; bids/joins are atomic Lua mutations. Inputs are Zod-validated at the boundary and rate-limited (30/min/session); dice rolled with `crypto.randomInt`; private hands are server-only and auth-gated per player (never broadcast before reveal).
 - 🎮 **Full ruleset** — standard Liar's Dice + 斋 (close-call) + 1点万能 + 叫1必斋 + the 中式扩展 (劈 challenge a non-adjacent bidder / 反劈 bite-back / 通杀 sweep-all) + Palifico (the one-die opener round). All toggleable in the lobby and enforced end-to-end.
 - ♿ **Accessibility** — full keyboard play (1-6 face · ±count · Enter bid · Space-to-challenge with confirm), ARIA live regions for turns/bids/reveal, `prefers-reduced-motion` static dice, themed focus rings, drawer focus-trap, ≥44px touch targets.
@@ -37,10 +38,11 @@ pnpm dev
 ```bash
 pnpm test            # 73 unit + integration tests (game engine, validation, round resolution)
 pnpm test:coverage   # vitest + @vitest/coverage-v8
-pnpm e2e             # Playwright: happy-path, reconnect, extensions, axe a11y — chromium + webkit (mobile Safari)
+pnpm e2e             # Playwright: happy-path, reconnect, extensions, solo, axe a11y — chromium + webkit (mobile Safari)
+PLAYWRIGHT_PORT=3100 pnpm e2e   # use a free port if :3000 is taken by another dev server
 ```
 
-The e2e suite (18 tests across 2 projects) drives two browser contexts through create → join → start → bid → counter-bid → challenge → reveal → next round (incl. asserting each player sees their own dice), a **complete game to elimination → final results → rematch → lobby**, a 通杀 (sweep) extension journey, a mid-game reload re-sync, and `@axe-core` WCAG A/AA scans of the home / lobby / bidding screens. It reuses a running `pnpm dev` (or starts one). First run needs the browsers: `pnpm exec playwright install chromium webkit`.
+The e2e suite (22 tests across 2 projects) drives two browser contexts through create → join → start → bid → counter-bid → challenge → reveal → next round (incl. asserting each player sees their own dice), a **complete game to elimination → final results → rematch → lobby**, a 通杀 (sweep) extension journey, a mid-game reload re-sync, the **offline / solo dice-cup** flow (roll · cover/peek · dice-count), and `@axe-core` WCAG A/AA scans of the home / lobby / bidding screens. It auto-starts a dev server (override the port with `PLAYWRIGHT_PORT`). First run needs the browsers: `pnpm exec playwright install chromium webkit`.
 
 ## Deploy
 
