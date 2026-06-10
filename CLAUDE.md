@@ -8,7 +8,7 @@
 - **Bucket**: `side-projects/` per `~/projects/CLAUDE.md` decision tree
 - **GitHub**: `github.com/xingfanxia/dahua-dice` (public, personal account)
 - **Vercel project**: `panpanmao/dahua-dice` (**personal scope** — NEVER use `computelabs`)
-- **Production URL**: `https://dahua-dice-<hash>-panpanmao.vercel.app` (currently SSO-walled; disable Standard Protection in Vercel dashboard to make public)
+- **Production URL**: `https://dahua-dice.vercel.app` — PUBLIC (stable domain; protection is `all_except_custom_domains`, so only the per-deploy `dahua-dice-<hash>-panpanmao.vercel.app` URLs are SSO-walled)
 
 ## Critical rules
 
@@ -34,14 +34,14 @@
 | UI | Tailwind v4 + React local state (no external state lib) |
 | Validation | Zod at API boundaries (`lib/validation/schemas.ts`) + Redis INCR rate limiter (`lib/rate-limit.ts`) |
 | Lint | Biome v2 (replaces ESLint + Prettier; CSS formatter disabled — Tailwind v4 syntax incompatible) |
-| Test | Vitest (69 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / axe a11y; 16 tests, chromium + webkit) |
+| Test | Vitest (73 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / full-game-to-rematch / axe a11y; 18 tests, chromium + webkit) |
 
 ## Commands
 
 ```bash
 pnpm dev            # http://localhost:3000
 pnpm build          # production build (~1.5-2s)
-pnpm test           # 69 unit + integration tests
+pnpm test           # 73 unit + integration tests
 pnpm e2e            # Playwright e2e (needs pnpm dev or auto-starts one); browsers: playwright install chromium webkit
 pnpm lint:fix       # Biome autofix
 vercel env pull .env.local --environment=production   # canonical env (Upstash vars live in Production scope)
@@ -96,7 +96,7 @@ Pure, unit-tested functions in `lib/game-engine/`:
 
 Pinned 中式扩展 / Palifico semantics: see design spec §10/§10B. `lib/room/resolution.ts` = `readHands` (tolerant parse) + `normalizeState` (coerce cjson-`{}` arrays) + `GAME_TTL`. Boundary validation via Zod (`lib/validation/schemas.ts`); rate limit via `lib/rate-limit.ts` (30/min action, 15/min room).
 
-All unit-tested (69 unit + integration, full game simulated end-to-end via `round.ts`). Live path covered by Playwright e2e incl. 通杀 + player-2 counter-bid journeys.
+All unit-tested (73 unit + integration, full game simulated end-to-end via `round.ts`). Live path covered by Playwright e2e incl. 通杀 + player-2 counter-bid + full-game-to-rematch journeys. ⚠ **The opening-bid floor MUST be clamped to total table dice** (`getStartingBidThreshold(..., totalDice)`) — an unclamped floor (e.g. 1v1 with 1 die each: floor 3 > table 2) leaves the round opener with zero legal actions and softlocks the game.
 
 ## File layout
 
@@ -120,7 +120,8 @@ lib/
 ├── audio/            # howl-instance + useDiceAudio
 ├── rate-limit.ts     # Redis INCR fixed-window limiter
 └── redis.ts          # Upstash client + REST URL/token exports
-tests/                # unit + integration (69) + e2e/ (16 Playwright, chromium + webkit)
+tests/                # unit + integration (73) + e2e/ (18 Playwright, chromium + webkit)
+scripts/audit/        # browser playability harness (2p full game / 3p elimination / refresh)
 docs/                 # specs / plans / research (all written before code)
 messages/             # zh-CN.json + en.json (parity-checked)
 ```
@@ -140,8 +141,18 @@ Generated via ffmpeg synthesis (no external assets). 4 themes × 2 formats at `p
 
 Remaining (need a human / physical device — can't be done from a dev session):
 
-1. **Vercel SSO wall** — toggle Deployment Protection off in dashboard for public access
-2. **Real-device gyro test** — need iPhone 14 Pro + Pixel 7 / Android for DeviceMotion validation on hardware
+1. **Real-device gyro test** — need iPhone 14 Pro + Pixel 7 / Android for DeviceMotion validation on hardware
+
+Done (2026-06-09 playability audit — the game could not be finished before this pass):
+
+- **Game-end softlock (CRITICAL)**: reveal screen rendered no action when `gameEnded` — the reveal→game_end transition needs a `nextRound` POST, so every finished game froze at 揭晓 forever; rematch was unreachable. Now: 查看最终结果 button → game_end → rematch. Found by actually playing a full game via `scripts/audit/play-full-game.mjs`.
+- **Late-game opener paralysis (CRITICAL)**: opening-bid floor `ceil(1.5×alive)` was never clamped to total table dice — 1v1 with 1 die each (floor 3 > table 2) left the opener with zero legal actions. Floor now clamps to `totalDice`.
+- **Eliminated-player view**: dead players 404-spammed `/api/hand` every round; now skipped + 💀 你已出局·观战中 spectator banner.
+- **BidPanel round leak**: panel surviving a round boundary kept the dead round's count/face (`key={state.round}` remount).
+- **SSE keepalive**: raw Upstash pipe died at 300s idle (undici BodyTimeoutError, zero keepalives); managed pump now sends `: ping`/20s and closes gracefully at 280s.
+- **Lobby**: non-owners now see 等待房主开始游戏… instead of nothing.
+- **Verified live** (real chromium contexts, prod build): 2p create→join→start→8 rounds→game_end→rematch→second game; 3p with mid-game elimination + spectator + game_end on all 3 screens; refresh mid-bidding and at reveal; 18 e2e green incl. new `full-game.spec.ts`.
+- **Vercel SSO note corrected**: `https://dahua-dice.vercel.app` (stable domain) is already public — protection is `all_except_custom_domains`, only per-deploy hash URLs are walled.
 
 Done (2026-05-28 full audit pass — 8 workstreams, see git log `audit/full-review-2026-05-28`):
 

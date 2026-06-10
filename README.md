@@ -8,8 +8,7 @@ A 2-8 player Liar's Dice web app with animated 2D dice, gyroscope shake-to-roll,
 </p>
 <p align="center"><em>Same screen, two of the four built-in themes (Modern Minimal · HK Neon).</em></p>
 
-**Live**: https://dahua-dice-6l1inck4f-panpanmao.vercel.app
-(currently behind Vercel "Standard Protection" — disable via Vercel dashboard → project settings → Deployment Protection to make publicly accessible)
+**Live**: https://dahua-dice.vercel.app (public — only per-deploy hash URLs are SSO-walled)
 
 ## Features
 
@@ -36,12 +35,12 @@ pnpm dev
 ## Test
 
 ```bash
-pnpm test            # 69 unit + integration tests (game engine, validation, round resolution)
+pnpm test            # 73 unit + integration tests (game engine, validation, round resolution)
 pnpm test:coverage   # vitest + @vitest/coverage-v8
 pnpm e2e             # Playwright: happy-path, reconnect, extensions, axe a11y — chromium + webkit (mobile Safari)
 ```
 
-The e2e suite (16 tests across 2 projects) drives two browser contexts through create → join → start → bid → counter-bid → challenge → reveal → next round (incl. asserting each player sees their own dice), a 通杀 (sweep) extension journey, a mid-game reload re-sync, and `@axe-core` WCAG A/AA scans of the home / lobby / bidding screens. It reuses a running `pnpm dev` (or starts one). First run needs the browsers: `pnpm exec playwright install chromium webkit`.
+The e2e suite (18 tests across 2 projects) drives two browser contexts through create → join → start → bid → counter-bid → challenge → reveal → next round (incl. asserting each player sees their own dice), a **complete game to elimination → final results → rematch → lobby**, a 通杀 (sweep) extension journey, a mid-game reload re-sync, and `@axe-core` WCAG A/AA scans of the home / lobby / bidding screens. It reuses a running `pnpm dev` (or starts one). First run needs the browsers: `pnpm exec playwright install chromium webkit`.
 
 ## Deploy
 

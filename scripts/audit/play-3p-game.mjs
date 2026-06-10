@@ -209,19 +209,17 @@ async function main() {
     if (!aliceHas) issues.push('[flow] owner has no rematch button at game_end');
     else {
       await alice.getByRole('button', { name: '再来一局' }).click();
+      // Lobby markers per role: owner gets 开始游戏 back, non-owners get the
+      // 等待房主 status line. Propagation is SSE/poll — wait, don't snapshot.
       for (const n of names) {
-        const back = await pages[n]
-          .getByRole('button', { name: /开始游戏|等待/ })
-          .first()
-          .isVisible()
+        const marker =
+          n === 'Alice'
+            ? pages[n].getByRole('button', { name: '开始游戏' })
+            : pages[n].getByText('等待房主').first();
+        const lobbyish = await marker
+          .waitFor({ timeout: 15000 })
+          .then(() => true)
           .catch(() => false);
-        // lobby for non-owners has no start button — check player list instead
-        const lobbyish =
-          back ||
-          (await pages[n]
-            .getByText('Alice')
-            .isVisible()
-            .catch(() => false));
         if (!lobbyish) issues.push(`[flow] rematch did not return ${n} to lobby`);
       }
       await shot(alice, 'Alice', 'rematch-lobby');
