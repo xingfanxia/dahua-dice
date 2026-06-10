@@ -158,6 +158,8 @@ Done (2026-06-10 — round-2 audit + solo mode; branch `fix/playability-audit-r2
   - Client: stale `/api/hand` can't overwrite a new round's dice (AbortController + round tag); whoami retried w/ backoff; trailing-refetch flag; 通杀 filters dead bidders; keyboard challenge respects busy; drawer resyncs toggles on open; silent start/rematch failures surface.
   - i18n: en bundle reachable via Accept-Language fallback (`lib/i18n.ts`); localized list separator + loading label; 165→182 keys, parity-checked.
 - **e2e hardening**: env-configurable port (`PLAYWRIGHT_PORT`) — `reuseExistingServer` silently grabbed another project's stale :3000 dev server and ran the whole suite against the wrong app; `RATE_LIMIT_DISABLED=1` on the test server (one shared localhost IP trips the per-IP caps); hydration-race-robust nickname fill in helpers (a pre-hydration fill was reset to '' by React → flaky "请输入昵称" / rate-limit at the home stage, a different test each run). Suite now ~38s (was ~1.7m of retry churn).
+- **game-end leave label**: the secondary button only `leave`s (navigates home; leaveRoom transfers ownership) — it never dissolves the room, so the "解散房间/Disband room" label (shown to non-owners too) was relabeled to "离开房间/Leave room"; removed the unused `game.disband` key.
+- **game-engine re-audit (inline)**: the audit's rules-dimension finder produced no output (spend-limit), so `resolveChallenge`/`Pi`/`Tongsha`, `isValidBid` (zhai/break-zhai/转斋/叫1必斋/Palifico/total-dice cap), `prepareNextRound` Palifico setup, and the cjson `normalizeState` boundary were all re-traced by hand — no engine bug found.
 
 Done (2026-06-09 playability audit — the game could not be finished before this pass):
 
