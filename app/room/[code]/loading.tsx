@@ -1,5 +1,8 @@
+import { getTranslations } from 'next-intl/server';
+
 /** Themed route-level loading fallback for the room (server-component fetch). */
-export default function Loading() {
+export default async function Loading() {
+  const t = await getTranslations('common');
   return (
     <main
       className="min-h-[100dvh] flex items-center justify-center"
@@ -9,7 +12,7 @@ export default function Loading() {
         className="text-2xl animate-pulse"
         style={{ color: 'var(--color-text-muted)' }}
         role="status"
-        aria-label="loading"
+        aria-label={t('loading')}
       >
         🎲
       </div>

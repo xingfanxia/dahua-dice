@@ -27,9 +27,11 @@ export function useRoomEvents(
 
   useEffect(() => {
     let es: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 
     function open() {
       es?.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       setStatus('connecting');
       es = new EventSource(`/api/stream/${code}`);
       es.onopen = () => {
@@ -65,9 +67,16 @@ export function useRoomEvents(
         }
       };
       es.onerror = () => {
-        // EventSource auto-reconnects; surface the dropped state so the UI can
-        // show a reconnect banner until onopen fires again.
         setStatus('error');
+        // A clean stream end (the 280s graceful rotation) leaves readyState at
+        // CONNECTING and the browser auto-reconnects. But a non-200 response (e.g. a
+        // transient 502 from the Upstash subscribe) FAILS the EventSource: readyState
+        // goes CLOSED and the browser will NOT retry — without this the player is
+        // locked out until a tab refocus. Drive our own reconnect in that case.
+        if (es && es.readyState === EventSource.CLOSED) {
+          if (reconnectTimer) clearTimeout(reconnectTimer);
+          reconnectTimer = setTimeout(open, 3000);
+        }
       };
     }
 
@@ -78,6 +87,7 @@ export function useRoomEvents(
     open();
     document.addEventListener('visibilitychange', handleVisible);
     return () => {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       es?.close();
       document.removeEventListener('visibilitychange', handleVisible);
     };

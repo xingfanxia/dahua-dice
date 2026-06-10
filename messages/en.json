@@ -22,7 +22,8 @@
     "enter": "Enter",
     "nicknameRequired": "Please enter a nickname",
     "nicknameTooLong": "Nickname up to 20 chars",
-    "invalidCode": "Invite code must be 6 chars"
+    "invalidCode": "Invite code must be 6 chars",
+    "soloMode": "Solo / offline mode"
   },
   "lobby": {
     "title": "Room {code}",
@@ -43,6 +44,7 @@
     "modifyRules": "Modify rules",
     "startGame": "Start game",
     "needMorePlayers": "Need at least 2 players",
+    "startFailed": "Couldn't start — please try again",
     "waitingForHost": "Waiting for the host to start…",
     "leaveRoom": "Leave room",
     "avatarHeader": "Choose avatar"
@@ -108,7 +110,8 @@
     "disconnected": "Disconnected",
     "rejoin": "Rejoin",
     "actionFailed": "Action failed, please try again",
-    "staleResynced": "State updated — please try again"
+    "staleResynced": "State updated — please try again",
+    "listSeparator": ", "
   },
   "errors": {
     "network": "Network error",
@@ -179,5 +182,21 @@
     "wolf": "Wolf",
     "lion": "Lion",
     "monkey": "Monkey"
+  },
+  "solo": {
+    "title": "Roll dice",
+    "subtitle": "Play face-to-face — this phone is your dice cup",
+    "roll": "Roll",
+    "reroll": "Roll again",
+    "rolling": "Rolling…",
+    "diceCount": "Dice",
+    "sides": "Sides",
+    "cover": "Cover",
+    "peek": "Peek",
+    "coveredHint": "Covered · tap to peek",
+    "tapToRoll": "Tap Roll to start",
+    "shakeHint": "Shake the phone to roll",
+    "enableShake": "Enable shake-to-roll",
+    "yourDice": "Your dice"
   }
 }

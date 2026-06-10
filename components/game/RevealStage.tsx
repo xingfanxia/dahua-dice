@@ -48,7 +48,7 @@ export function RevealStage({
   const wildCount = state.rules.aceWild && !verified.isZhai && !(state.palificoActive ?? false);
   const loserNames = (result?.loserIds ?? [])
     .map((id) => state.players.find((p) => p.id === id)?.nick ?? '?')
-    .join('、');
+    .join(t('game.listSeparator'));
   const kindLabel =
     result?.kind === 'pi'
       ? t('game.kindPi')

@@ -14,6 +14,20 @@ import { z } from 'zod';
 const codeField = z.string().min(1).max(12);
 
 /**
+ * Canonical theme ids. `theme` rides in from the unauthenticated /api/room and
+ * /api/session bodies, is persisted into room state, and is reflected back by the
+ * unauthenticated GET /api/room/[code] — so it MUST be clamped to a known value,
+ * not a free-form string (otherwise a bloated theme string becomes a reflected
+ * amplification vector).
+ */
+const THEME_IDS = ['modern-minimal', 'classic-bar', 'hk-neon', 'cartoon'] as const;
+export function sanitizeTheme(value: unknown): string {
+  return typeof value === 'string' && (THEME_IDS as readonly string[]).includes(value)
+    ? value
+    : 'modern-minimal';
+}
+
+/**
  * GameRules — every field range-checked. `diceCount`/`diceSides` use literal
  * unions so the parsed type matches `GameRules` exactly; unknown keys are
  * stripped (zod object default), so junk fields can't ride along into Redis.

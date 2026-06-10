@@ -39,6 +39,18 @@ export function CustomizationDrawer({
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
 
+  // Re-sync local toggle state from the live rules each time the drawer opens, so a
+  // rejected mid-game save (or another owner's rules change arriving via SSE) can't
+  // leave the panel showing toggles that aren't actually in effect.
+  useEffect(() => {
+    if (!open) return;
+    setDiceCount(rules.diceCount);
+    setAceWild(rules.aceWild);
+    setAllowZhai(rules.allowZhai);
+    setChineseExt(rules.chineseExtensions);
+    setPalifico(rules.paliFicoVariant);
+  }, [open, rules]);
+
   // Focus management for the modal drawer (spec §17C): move focus in on open,
   // restore to the trigger on close. Tab-trapping is handled in onKeyDown below.
   useEffect(() => {
