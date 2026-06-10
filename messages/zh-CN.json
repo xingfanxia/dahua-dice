@@ -43,6 +43,7 @@
     "modifyRules": "修改规则",
     "startGame": "开始游戏",
     "needMorePlayers": "至少 2 人才能开始",
+    "waitingForHost": "等待房主开始游戏…",
     "leaveRoom": "离开房间",
     "avatarHeader": "选择头像"
   },
@@ -73,6 +74,7 @@
     "playerLostDie": "{name} 输一颗骰子",
     "winner": "{name} 胜!",
     "nextRound": "下一局",
+    "toFinalResult": "查看最终结果",
     "rematch": "再来一局",
     "disband": "解散房间",
     "waitingFirstBid": "等待第一个叫数…",
@@ -98,6 +100,7 @@
     "lostDie": "输一颗骰",
     "lostNDice": "输 {n} 颗骰",
     "eliminated": "已出局",
+    "spectating": "你已出局 · 观战中",
     "challengeConfirm": "确定开牌？",
     "challengeConfirmBtn": "确认开!",
     "diceLeftLabel": "剩 {n} 颗骰",

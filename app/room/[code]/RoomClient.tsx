@@ -388,7 +388,7 @@ function LobbyView({
       </section>
 
       <div className="mt-auto flex flex-col gap-2">
-        {isOwner && (
+        {isOwner ? (
           <button
             type="button"
             onClick={onStart}
@@ -401,6 +401,14 @@ function LobbyView({
           >
             {canStart ? t('lobby.startGame') : t('lobby.needMorePlayers')}
           </button>
+        ) : (
+          <p
+            className="py-4 text-center text-sm rounded-2xl"
+            role="status"
+            style={{ backgroundColor: tokens.colors.surface, color: tokens.colors.textMuted }}
+          >
+            {t('lobby.waitingForHost')}
+          </p>
         )}
         <button
           type="button"
@@ -507,6 +515,8 @@ function GameView({
 
   // Fetch my hand when game running. state.round is an intentional refetch
   // trigger — fresh dice are dealt each round even though the URL is unchanged.
+  // Eliminated players are dealt nothing — fetching would 404-spam every round.
+  const amAlive = state.players.find((p) => p.id === myPlayerId)?.alive ?? false;
   const lastRoundRef = useRef(state.round);
   useEffect(() => {
     if (state.phase !== 'rolling' && state.phase !== 'bidding' && state.phase !== 'reveal') return;
@@ -516,13 +526,14 @@ function GameView({
       lastRoundRef.current = state.round;
       setHand(null);
     }
+    if (!amAlive) return;
     fetch(`/api/hand/${state.code}`)
       .then((r) => r.json())
       .then((d) => {
         if (d.ok) setHand(d.hand);
       })
       .catch(() => null);
-  }, [state.phase, state.code, state.round]);
+  }, [state.phase, state.code, state.round, amAlive]);
 
   // Fetch all hands on reveal
   useEffect(() => {
@@ -691,6 +702,10 @@ function GameView({
 
       {state.phase === 'bidding' && isMyTurn && (
         <BidPanel
+          // Remount per round: count/face are useState initialized from lastBid,
+          // and a panel surviving a round transition (e.g. 409 resync while the
+          // same player keeps the turn) would carry the dead round's values.
+          key={state.round}
           state={state}
           alivePlayers={alivePlayers}
           onBid={submitBid}
@@ -699,6 +714,16 @@ function GameView({
           onTongsha={submitTongsha}
           busy={busy}
         />
+      )}
+
+      {myPlayer && !myPlayer.alive && state.phase !== 'game_end' && (
+        <p
+          className="text-center text-xs py-1.5 rounded-lg"
+          role="status"
+          style={{ backgroundColor: tokens.colors.surface, color: tokens.colors.textMuted }}
+        >
+          💀 {t('game.spectating')}
+        </p>
       )}
 
       {state.phase === 'bidding' && !isMyTurn && (
@@ -711,19 +736,20 @@ function GameView({
         <RevealStage state={state} hands={allHands} myPlayerId={myPlayerId} />
       )}
 
-      {state.phase === 'reveal' &&
-        state.lastChallengeResult &&
-        !state.lastChallengeResult.gameEnded && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={submitNextRound}
-            className="py-3 rounded-2xl font-medium disabled:opacity-40"
-            style={{ backgroundColor: tokens.colors.primary, color: tokens.colors.bg }}
-          >
-            {t('game.nextRound')}
-          </button>
-        )}
+      {/* The reveal→next transition ALWAYS needs a nextRound POST — including when
+          the game just ended (server flips phase to game_end where rematch lives).
+          Rendering no button on gameEnded used to softlock every finished game. */}
+      {state.phase === 'reveal' && state.lastChallengeResult && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={submitNextRound}
+          className="py-3 rounded-2xl font-medium disabled:opacity-40"
+          style={{ backgroundColor: tokens.colors.primary, color: tokens.colors.bg }}
+        >
+          {state.lastChallengeResult.gameEnded ? t('game.toFinalResult') : t('game.nextRound')}
+        </button>
+      )}
 
       {state.phase === 'game_end' && (
         <div className="flex flex-col items-center gap-3 mt-4">

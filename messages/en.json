@@ -43,6 +43,7 @@
     "modifyRules": "Modify rules",
     "startGame": "Start game",
     "needMorePlayers": "Need at least 2 players",
+    "waitingForHost": "Waiting for the host to start…",
     "leaveRoom": "Leave room",
     "avatarHeader": "Choose avatar"
   },
@@ -73,6 +74,7 @@
     "playerLostDie": "{name} lost a die",
     "winner": "{name} wins!",
     "nextRound": "Next round",
+    "toFinalResult": "Final results",
     "rematch": "Rematch",
     "disband": "Disband room",
     "waitingFirstBid": "Waiting for first bid…",
@@ -98,6 +100,7 @@
     "lostDie": "lost a die",
     "lostNDice": "lost {n} dice",
     "eliminated": "eliminated",
+    "spectating": "You're out · spectating",
     "challengeConfirm": "Open the cups?",
     "challengeConfirmBtn": "Confirm",
     "diceLeftLabel": "{n} dice left",
