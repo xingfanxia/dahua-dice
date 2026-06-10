@@ -26,6 +26,17 @@ test.describe('accessibility (axe)', () => {
     expect(results.violations).toEqual([]);
   });
 
+  test('solo dice-cup has no WCAG A/AA violations (idle + rolled)', async ({ page }) => {
+    await page.goto('/solo');
+    await page.waitForLoadState('networkidle');
+    expect((await scan(page)).violations).toEqual([]);
+    // Re-scan after a roll: the dice + cover/peek + reroll controls only render once
+    // a hand exists, so the idle scan doesn't cover them.
+    await page.getByRole('button', { name: /^摇骰子$|^Roll$/ }).click();
+    await expect(page.getByText(/你的骰子:|Your dice:/)).toBeVisible({ timeout: 10_000 });
+    expect((await scan(page)).violations).toEqual([]);
+  });
+
   test('lobby has no WCAG A/AA violations', async ({ page }) => {
     await createRoom(page, 'Alice');
     const results = await scan(page);
