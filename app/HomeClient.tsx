@@ -273,6 +273,17 @@ export function HomeClient({
           >
             {err ?? ' '}
           </p>
+
+          {/* offline / solo entry — no room, no network, just a local dice cup */}
+          <button
+            type="button"
+            onClick={() => router.push('/solo')}
+            disabled={busy !== null}
+            className="mt-2 font-ui text-sm underline-offset-4 transition hover:underline disabled:opacity-60"
+            style={{ color: tokens.colors.textMuted }}
+          >
+            🎲 {t('home.soloMode')} →
+          </button>
         </section>
 
         {/* footer — theme picker */}
