@@ -446,7 +446,7 @@ function applyChineseExtension(action: ChineseExtAction, state: GameState): Game
 ```
 
 **Key rules implemented**:
-- 起叫数 = `ceil(rules.startingBidFactor × alivePlayers)`，斋叫为 `alivePlayers`
+- 起叫数 = `ceil(rules.startingBidFactor × alivePlayers)`，斋叫为 `alivePlayers`；**两者都 clamp 到场上骰子总数**（2026-06-09 修订：不 clamp 时残局 1v1 各 1 颗骰 → 起叫门槛 3 > 总骰 2，开局者无任何合法动作，死锁）
 - 加叫合法性：`count > prev.count` OR (`count === prev.count && face > prev.face`)
 - 斋后破斋（飞）：`next.count >= prev.count × 2`
 - 进入斋（中途转斋）：只需满足普通加叫规则（research §2.3），NO halve-pool 限制
