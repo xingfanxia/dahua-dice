@@ -63,7 +63,6 @@ vercel --prod --scope panpanmao   # deploy
 | POST | `/api/action` | Universal action — Zod-validated discriminated union: join / start / bid / challenge / **pi** / **tongsha** / nextRound / leave / setAvatar / updateRules / **rematch**. Rate-limited 30/min/session |
 | GET | `/api/hand/[code]` | Authenticated: caller's private dice only |
 | GET | `/api/stream/[code]` | SSE pipe to Upstash subscribe channel |
-| GET | `/api/events/[code]?since=ID` | Redis Stream since-ID replay — **present but NOT wired** (no caller anywhere); client reconnects via `/full` refetch on SSE `onopen` + 3s poll. Kept for a future incremental-catchup upgrade |
 | POST | `/api/session` | Bootstrap or refresh anonymous session |
 | GET | `/api/whoami` | Read session — playerId / nick / currentRoom |
 | GET | `/api/health` | Health check `{ok:true}` |
@@ -85,7 +84,7 @@ Required in `.env.local` (auto-pulled from Vercel Production scope):
 | `session:{token}` | JSON | 24h | playerId / nick / currentRoom / theme / avatar / customization |
 | `room:{code}:state` | JSON | 30m lobby / 6h game | Full RoomState (phase, players, currentTurnIdx, lastBid, **bidChain**, **palificoActive/BidderId/Triggered**, rules, version) |
 | `room:{code}:hands` | Hash | 6h | playerId → number[] (private dice) |
-| `room:{code}:events` | Stream | 6h | event log via XADD; XRANGE for replay |
+| `room:{code}:events` | Pub/Sub channel | — | Lua `PUBLISH` → `/api/stream` SSE pipe. Ephemeral (a Redis channel, not a stored key — no TTL). No persisted XADD stream as of 2026-06-11 (the dead `/api/events` XRANGE replay + per-mutation XADD were removed) |
 
 ## Game engine
 
@@ -146,6 +145,8 @@ Generated via ffmpeg synthesis (no external assets). 4 themes × 2 formats at `p
 Remaining (need a human / physical device — can't be done from a dev session):
 
 1. **Real-device gyro test** — need iPhone 14 Pro + Pixel 7 / Android for DeviceMotion validation on hardware
+
+Done (2026-06-11 — dead-code cleanup): removed the unused `/api/events/[code]` since-ID replay endpoint (no caller anywhere — reconnect uses `/full` refetch) and dropped the per-mutation `XADD`+`EXPIRE` to `room:{code}:events` from every Lua script (kept `PUBLISH`, which is a separate Redis namespace and drives the SSE pipe). `room:{code}:events` is now a pure pub/sub channel, no persisted stream. Realtime sync unaffected (verified via the audit harness).
 
 Done (2026-06-10 — round-2 audit + solo mode; branch `fix/playability-audit-r2-2026-06-09`, 79 unit + 32 e2e green ×2):
 
