@@ -45,7 +45,13 @@ export function BidPanel({
   const canTongsha =
     rules.chineseExtensions.tongsha &&
     !!state.lastBid &&
-    [...new Set(chain.map((e) => e.playerId))].some((id) => id !== meId);
+    [...new Set(chain.map((e) => e.playerId))].some((id) => {
+      // Must be a still-alive opponent — offering 通杀 against a dead/left bidder
+      // (mirrors the piTargets filter) only produces a server rejection.
+      if (id === meId) return false;
+      const p = state.players.find((pl) => pl.id === id);
+      return !!p && p.alive;
+    });
 
   const totalDice = state.players.reduce((s, p) => s + (p.alive ? p.diceLeft : 0), 0);
   const initialCount = palifico
@@ -125,6 +131,9 @@ export function BidPanel({
       if (e.key === 'Enter') {
         e.preventDefault();
         if (s.challengePending) {
+          // Same busy-guard as the bid path: a challenge fired via keyboard while a
+          // bid POST is still in flight would race the in-flight action.
+          if (s.busy) return;
           setChallengePending(false);
           s.onChallenge();
         } else if (s.validation.ok && !s.busy) {

@@ -27,31 +27,63 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // Identify ourselves from cookie via /api/whoami
+  // Identify ourselves from cookie via /api/whoami. Retried with backoff: a single
+  // swallowed failure used to leave myPlayerId null forever, so the player could
+  // never take their turn (isMyTurn keys on it) — soft-locking the whole table.
   useEffect(() => {
-    fetch('/api/whoami')
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.ok) setMyPlayerId(d.playerId);
-      })
-      .catch(() => null);
+    let cancelled = false;
+    async function identify(attempt = 0) {
+      try {
+        const r = await fetch('/api/whoami');
+        const d = await r.json();
+        if (cancelled) return;
+        if (d.ok && d.playerId) {
+          setMyPlayerId(d.playerId);
+          return;
+        }
+        throw new Error('no_player_id');
+      } catch {
+        if (!cancelled && attempt < 5) {
+          setTimeout(() => identify(attempt + 1), 1000 * (attempt + 1));
+        }
+      }
+    }
+    identify();
     // Arm Howler's autoUnlock for iOS Safari (needs to bind to user gesture)
     unlockAudio();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  // Timestamp of the last successful /full read. Drives the reconnect / offline UI
+  // off ACTUAL sync health rather than the SSE channel alone — so the full-screen
+  // "disconnected" lockout only fires when polling has ALSO stopped landing fresh
+  // state (e.g. room expired or membership lost), not on a transient SSE blip while
+  // the 3s poll is still keeping the game live.
+  const lastSyncRef = useRef(Date.now());
   // SSE-driven sync: on any room event, refetch the full state. An in-flight guard
-  // collapses bursts (e.g. an SSE reconnect storm) into a single /full read.
+  // collapses bursts into a single /full read; a trailing-refetch flag ensures an
+  // event arriving mid-flight isn't dropped (it re-runs once the current read ends).
   const refetching = useRef(false);
+  const pendingRefetch = useRef(false);
   const refetch = useCallback(async () => {
-    if (refetching.current) return;
+    if (refetching.current) {
+      pendingRefetch.current = true;
+      return;
+    }
     refetching.current = true;
     try {
-      const res = await fetch(`/api/room/${code}/full`, { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.ok && data.state) {
-        setState((prev) => (data.state.version > prev.version ? data.state : prev));
-      }
+      do {
+        pendingRefetch.current = false;
+        const res = await fetch(`/api/room/${code}/full`, { cache: 'no-store' });
+        if (!res.ok) continue; // 403/404 → no fresh sync; staleness will surface it
+        const data = await res.json();
+        if (data.ok && data.state) {
+          lastSyncRef.current = Date.now();
+          setState((prev) => (data.state.version > prev.version ? data.state : prev));
+        }
+      } while (pendingRefetch.current);
     } catch {
     } finally {
       refetching.current = false;
@@ -69,17 +101,19 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
     return () => clearInterval(interval);
   }, [refetch]);
 
-  // Reconnect UX (spec §10A): SSE drop → banner; sustained >30s → full-screen rejoin.
+  // Reconnect UX (spec §10A): SSE dropped AND sync going stale → banner; sync stale
+  // >30s → full-screen rejoin. A 1s ticker evaluates real sync health so a brief
+  // SSE blip (e.g. the 280s graceful stream rotation) doesn't flash the banner, and
+  // the lockout never appears while the 3s poll is still landing fresh state.
   const [reconnecting, setReconnecting] = useState(false);
   const [longOffline, setLongOffline] = useState(false);
   useEffect(() => {
-    if (connStatus === 'error') {
-      setReconnecting(true);
-      const timer = setTimeout(() => setLongOffline(true), 30000);
-      return () => clearTimeout(timer);
-    }
-    setReconnecting(false);
-    setLongOffline(false);
+    const id = setInterval(() => {
+      const staleMs = Date.now() - lastSyncRef.current;
+      setReconnecting(connStatus === 'error' && staleMs > 4000);
+      setLongOffline(staleMs > 30000);
+    }, 1000);
+    return () => clearInterval(id);
   }, [connStatus]);
 
   async function handleCopy() {
@@ -104,14 +138,27 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
     }
   }
 
+  const [startError, setStartError] = useState<string | null>(null);
   async function handleStart() {
     setBusy(true);
     try {
-      await fetch('/api/action', {
+      const r = await fetch('/api/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // The start CAS + retry is handled server-side (against the server's own
+        // read), so the client doesn't send a version. We still surface a failure
+        // instead of swallowing it (the old silent path).
         body: JSON.stringify({ type: 'start', code }),
       });
+      const j = await r.json().catch(() => ({ ok: false }) as { ok: false });
+      if (!j.ok) {
+        await refetch();
+        setStartError(t('lobby.startFailed'));
+        setTimeout(() => setStartError(null), 3000);
+      }
+    } catch {
+      setStartError(t('lobby.startFailed'));
+      setTimeout(() => setStartError(null), 3000);
     } finally {
       setBusy(false);
     }
@@ -193,7 +240,10 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
         <p className="text-xl font-display">{t('game.disconnected')}</p>
         <button
           type="button"
-          onClick={() => router.refresh()}
+          // Full reload re-runs the SSR fetch AND tears down the dead EventSource /
+          // client state — router.refresh() only re-fetches RSC and leaves the
+          // permanently-CLOSED SSE + stale client error in place (a no-op rejoin).
+          onClick={() => window.location.reload()}
           className="px-6 min-h-[44px] rounded-2xl font-medium"
           style={{ backgroundColor: tokens.colors.primary, color: tokens.colors.bg }}
         >
@@ -221,6 +271,15 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
           style={{ backgroundColor: `${tokens.colors.danger}22`, color: tokens.colors.danger }}
         >
           {saveError}
+        </div>
+      )}
+      {startError && (
+        <div
+          className="text-xs text-center py-1.5 rounded-lg"
+          role="alert"
+          style={{ backgroundColor: `${tokens.colors.danger}22`, color: tokens.colors.danger }}
+        >
+          {startError}
         </div>
       )}
       {/* Header */}
@@ -460,6 +519,10 @@ function GameView({
   // POST an action, surface failures, and re-sync on a stale-version (409) reject.
   // Returns true on success. `stale` means the server moved on (someone else acted
   // or the turn advanced) — refetch pulls the live state so the player can retry.
+  // The 10s abort bounds a hung connection: without it `busy` never clears and the
+  // panel's buttons stay disabled forever (softlock on a flaky mobile network).
+  // Every failure path refetches — a lost response may mean the action actually
+  // committed server-side, and refetch converges the client either way.
   const postAction = useCallback(
     async (payload: Record<string, unknown>): Promise<boolean> => {
       try {
@@ -467,19 +530,17 @@ function GameView({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
+          signal: AbortSignal.timeout?.(10_000),
         });
         const data = await res.json().catch(() => ({ ok: false }) as { ok: false });
         if (!data.ok) {
-          if (data.reason === 'stale') {
-            await refetch();
-            flashAction(t('game.staleResynced'));
-          } else {
-            flashAction(t('game.actionFailed'));
-          }
+          await refetch();
+          flashAction(data.reason === 'stale' ? t('game.staleResynced') : t('game.actionFailed'));
           return false;
         }
         return true;
       } catch {
+        await refetch();
         flashAction(t('game.actionFailed'));
         return false;
       }
@@ -491,8 +552,13 @@ function GameView({
   const phaseRef = useRef(state.phase);
   phaseRef.current = state.phase;
 
-  // Audio coupling — fire stingers on phase transitions
+  // Audio coupling — fire stingers ONCE per phase transition. Gated on a ref of the
+  // last phase that fired so unrelated re-renders (the `audio`/`state.players`
+  // identities change every render) don't replay the reveal/win/lose stinger.
+  const lastAudioPhaseRef = useRef<string | null>(null);
   useEffect(() => {
+    if (lastAudioPhaseRef.current === state.phase) return;
+    lastAudioPhaseRef.current = state.phase;
     if (state.phase === 'reveal') audio.reveal();
     if (state.phase === 'game_end') {
       const r = state.lastChallengeResult;
@@ -527,12 +593,18 @@ function GameView({
       setHand(null);
     }
     if (!amAlive) return;
-    fetch(`/api/hand/${state.code}`)
+    // Tag the fetch with the round it was issued for + abort on cleanup, so a slow
+    // response from the PREVIOUS round can never overwrite the new round's hand
+    // (a last-writer-wins reorder would otherwise show dice the player doesn't have).
+    const ctrl = new AbortController();
+    const fetchedRound = state.round;
+    fetch(`/api/hand/${state.code}`, { signal: ctrl.signal })
       .then((r) => r.json())
       .then((d) => {
-        if (d.ok) setHand(d.hand);
+        if (d.ok && lastRoundRef.current === fetchedRound) setHand(d.hand);
       })
       .catch(() => null);
+    return () => ctrl.abort();
   }, [state.phase, state.code, state.round, amAlive]);
 
   // Fetch all hands on reveal
@@ -623,11 +695,9 @@ function GameView({
   async function submitRematch() {
     setBusy(true);
     try {
-      await fetch('/api/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'rematch', code }),
-      });
+      // Route through postAction so a failed rematch (e.g. 429 rate_limited) flashes
+      // an error + re-syncs instead of silently leaving the owner on the end screen.
+      await postAction({ type: 'rematch', code });
     } finally {
       setBusy(false);
     }
@@ -775,13 +845,16 @@ function GameView({
                 {t('game.rematch')}
               </button>
             )}
+            {/* Honest label: this action just leaves to home (the leaveRoom Lua
+                transfers ownership to a remaining player), it does not dissolve
+                the room — so don't promise "disband" (esp. to non-owners). */}
             <button
               type="button"
               onClick={leaveGame}
               className="flex-1 py-3 min-h-[44px] rounded-2xl font-medium"
               style={{ backgroundColor: tokens.colors.surface, color: tokens.colors.textMuted }}
             >
-              {t('game.disband')}
+              {t('lobby.leaveRoom')}
             </button>
           </div>
         </div>

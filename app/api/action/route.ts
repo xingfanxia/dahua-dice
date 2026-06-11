@@ -97,29 +97,53 @@ export async function POST(req: NextRequest) {
     case 'start': {
       // Generate hands in Node (crypto.randomInt) then atomically commit via Lua
       // so phase advance + hands hash are written in a single CAS.
-      const state = await redis.get<RoomState>(stateKey);
-      if (!state) return NextResponse.json({ ok: false, reason: 'no_room' }, { status: 404 });
-      if (state.phase !== 'lobby') {
-        return NextResponse.json({ ok: false, reason: 'wrong_phase' }, { status: 400 });
+      //
+      // The CAS guards the SERVER's read→eval window (two Redis round-trips): a
+      // join / rules change landing in that gap would otherwise deal hands for a
+      // stale roster (a player who joined enters bidding with no dice). We CAS on
+      // the version WE just read — not the client's — and retry on a stale reject,
+      // so a client whose view is a beat behind (e.g. it just saved a rules change)
+      // still starts cleanly instead of being falsely rejected.
+      const START_RETRIES = 4;
+      for (let attempt = 0; attempt < START_RETRIES; attempt++) {
+        const state = await redis.get<RoomState>(stateKey);
+        if (!state) return NextResponse.json({ ok: false, reason: 'no_room' }, { status: 404 });
+        if (state.phase !== 'lobby') {
+          return NextResponse.json({ ok: false, reason: 'wrong_phase' }, { status: 400 });
+        }
+        const handArgs: string[] = [];
+        for (const p of state.players) {
+          if (!p.alive) continue;
+          handArgs.push(p.id, JSON.stringify(rollDice(p.diceLeft, state.rules.diceSides)));
+        }
+        const result = await runScript(
+          'startGame',
+          [stateKey, handsKey],
+          [session.playerId, String(state.version), ...handArgs],
+        );
+        if (result.ok || result.reason !== 'stale') {
+          return NextResponse.json(result, {
+            status: result.ok ? 200 : statusForReason(result.reason),
+          });
+        }
+        // stale: the roster moved in our read→eval window — re-read and re-roll.
       }
-      const handArgs: string[] = [];
-      for (const p of state.players) {
-        if (!p.alive) continue;
-        handArgs.push(p.id, JSON.stringify(rollDice(p.diceLeft, state.rules.diceSides)));
-      }
-      const result = await runScript(
-        'startGame',
-        [stateKey, handsKey],
-        [session.playerId, ...handArgs],
-      );
-      return NextResponse.json(result, {
-        status: result.ok ? 200 : statusForReason(result.reason),
-      });
+      return NextResponse.json({ ok: false, reason: 'stale' }, { status: 409 });
     }
 
     case 'bid': {
       const state = await redis.get<RoomState>(stateKey);
       if (!state) return NextResponse.json({ ok: false, reason: 'no_room' }, { status: 404 });
+      // Bind validation to the version we'll CAS on: validating against this fresh
+      // read but committing on a different client-supplied version could slip an
+      // illegal (e.g. lower) bid past isValidBid. Reject the stale read up front —
+      // same guard the challenge / 劈 / 通杀 path already uses.
+      if (state.version !== body.expectedVersion) {
+        return NextResponse.json(
+          { ok: false, reason: 'stale', currentVersion: state.version },
+          { status: 409 },
+        );
+      }
       const ns = normalizeState(state);
       const alive = ns.players.filter((p) => p.alive).length;
       const totalDice = ns.players.reduce((sum, p) => sum + (p.alive ? p.diceLeft : 0), 0);

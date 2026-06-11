@@ -53,6 +53,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
   //     the browser EventSource auto-reconnects either way.
   const upstream = upstreamResponse.body.getReader();
   const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
   const PING_MS = 20_000;
   const DEADLINE_MS = 280_000; // < maxDuration (300s) and < undici bodyTimeout (300s)
 
@@ -73,6 +74,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
           // controller already errored/closed — nothing to release
         }
       };
+      // Keepalive frames are enqueued from this interval, interleaving with the read
+      // loop below between its awaits. If we forwarded raw upstream chunks, a ping
+      // landing between two halves of one SSE frame would split it — the browser
+      // would see a truncated `data:` line + `\n\n` and drop the event. So the read
+      // loop reassembles upstream bytes into COMPLETE frames (terminated by a blank
+      // line) before enqueuing; a `: ping\n\n` is itself a complete comment frame,
+      // so it can only ever land on a frame boundary now.
       ping = setInterval(() => {
         try {
           controller.enqueue(encoder.encode(': ping\n\n'));
@@ -82,11 +90,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
       }, PING_MS);
       deadline = setTimeout(close, DEADLINE_MS);
       (async () => {
+        let buf = '';
         try {
           while (true) {
             const { done, value } = await upstream.read();
             if (done) break;
-            controller.enqueue(value);
+            buf += decoder.decode(value, { stream: true });
+            let sep = buf.indexOf('\n\n');
+            while (sep >= 0) {
+              const frame = buf.slice(0, sep + 2);
+              buf = buf.slice(sep + 2);
+              controller.enqueue(encoder.encode(frame));
+              sep = buf.indexOf('\n\n');
+            }
           }
         } catch {
           // upstream died (idle timeout / network) — close cleanly, client reconnects

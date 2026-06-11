@@ -27,6 +27,10 @@ export async function rateLimit(
   limit: number,
   windowSec: number,
 ): Promise<RateLimitResult> {
+  // Opt-out for e2e: the suite drives many room/session creates from a single
+  // shared localhost IP, which legitimately trips the per-IP caps. Only the
+  // Playwright dev server sets this — production never does, so prod stays capped.
+  if (process.env.RATE_LIMIT_DISABLED === '1') return { ok: true, remaining: limit };
   const count = (await redis.eval(
     INCR_WITH_TTL,
     [`rl:${identifier}`],

@@ -6,6 +6,7 @@ import { DEFAULT_RULES, type RoomState } from '@/lib/game-engine/types';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 import { redis } from '@/lib/redis';
 import { generateInviteCode } from '@/lib/room/invite-code';
+import { sanitizeTheme } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   const { token, session } = await createSession({
     nick: v.value,
-    theme: theme ?? 'modern-minimal',
+    theme: sanitizeTheme(theme),
   });
 
   let code = generateInviteCode();

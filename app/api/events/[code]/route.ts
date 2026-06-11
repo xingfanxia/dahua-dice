@@ -6,8 +6,13 @@ import { isValidInviteCode } from '@/lib/room/invite-code';
 export const runtime = 'nodejs';
 
 /**
- * Replay recent events from the room's Redis Stream. Members-only. Used by
- * clients on reconnect to recover any events missed during the disconnect window.
+ * Replay recent events from the room's Redis Stream (members-only). Intended for a
+ * since-ID reconnect catch-up.
+ *
+ * NOTE: not currently wired — the client recovers on reconnect via a full
+ * `/api/room/[code]/full` refetch (SSE `onopen` → sync → refetch, plus the 3s
+ * safety poll), which is simpler and version-gated. This endpoint + the per-mutation
+ * XADD event log remain available for a future incremental-replay upgrade.
  *
  * Query: ?since=<lastEventId>  (defaults to '0-0' = from beginning)
  */

@@ -32,17 +32,18 @@
 | Audio | `howler` v2 — 8-slice ffmpeg-synth sprites (collide/shake/reveal/win/lose/click/settle/stinger), 4 themes |
 | i18n | `next-intl` (zh-CN default + en, parity-checked) |
 | UI | Tailwind v4 + React local state (no external state lib) |
-| Validation | Zod at API boundaries (`lib/validation/schemas.ts`) + Redis INCR rate limiter (`lib/rate-limit.ts`) |
+| Validation | Zod at API boundaries (`lib/validation/schemas.ts`) + Redis INCR rate limiter (`lib/rate-limit.ts`; 30/min action · 15/min room · 20/min session, all per-IP/session; `RATE_LIMIT_DISABLED=1` opt-out for e2e only) |
 | Lint | Biome v2 (replaces ESLint + Prettier; CSS formatter disabled — Tailwind v4 syntax incompatible) |
-| Test | Vitest (73 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / full-game-to-rematch / axe a11y; 18 tests, chromium + webkit) |
+| Test | Vitest (79 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / full-game-to-rematch / solo / 劈 / palifico / 8-sided / axe a11y; 32 tests, chromium + webkit) |
 
 ## Commands
 
 ```bash
 pnpm dev            # http://localhost:3000
 pnpm build          # production build (~1.5-2s)
-pnpm test           # 73 unit + integration tests
-pnpm e2e            # Playwright e2e (needs pnpm dev or auto-starts one); browsers: playwright install chromium webkit
+pnpm test           # 79 unit + integration tests
+pnpm e2e            # Playwright e2e (auto-starts a dev server); browsers: playwright install chromium webkit
+PLAYWRIGHT_PORT=3100 pnpm e2e   # use when :3000 is taken by another project's dev server (reuseExistingServer would grab it)
 pnpm lint:fix       # Biome autofix
 vercel env pull .env.local --environment=production   # canonical env (Upstash vars live in Production scope)
 vercel --prod --scope panpanmao   # deploy
@@ -52,7 +53,8 @@ vercel --prod --scope panpanmao   # deploy
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/` | Home — nickname + 创建/加入 |
+| GET | `/` | Home — nickname + 创建/加入 + 线下/单人模式 entry |
+| GET | `/solo` | Offline / solo dice-cup — local `crypto` rolls, no room/network (`app/solo/SoloClient.tsx`) |
 | GET | `/room/[code]` | Room (lobby + game, phase-driven) |
 | POST | `/api/room` | Create room → return code + token |
 | GET | `/api/room/[code]` | Public room info (phase, playerCount, joinable) |
@@ -61,7 +63,7 @@ vercel --prod --scope panpanmao   # deploy
 | POST | `/api/action` | Universal action — Zod-validated discriminated union: join / start / bid / challenge / **pi** / **tongsha** / nextRound / leave / setAvatar / updateRules / **rematch**. Rate-limited 30/min/session |
 | GET | `/api/hand/[code]` | Authenticated: caller's private dice only |
 | GET | `/api/stream/[code]` | SSE pipe to Upstash subscribe channel |
-| GET | `/api/events/[code]?since=ID` | Redis Stream replay for reconnect catchup |
+| GET | `/api/events/[code]?since=ID` | Redis Stream since-ID replay — **present but NOT wired** (no caller anywhere); client reconnects via `/full` refetch on SSE `onopen` + 3s poll. Kept for a future incremental-catchup upgrade |
 | POST | `/api/session` | Bootstrap or refresh anonymous session |
 | GET | `/api/whoami` | Read session — playerId / nick / currentRoom |
 | GET | `/api/health` | Health check `{ok:true}` |
@@ -104,6 +106,7 @@ All unit-tested (73 unit + integration, full game simulated end-to-end via `roun
 app/
 ├── api/              # Route Handlers (server-only)
 ├── room/[code]/      # Lobby + game (RoomClient.tsx is the client component)
+├── solo/             # Offline solo dice-cup (SoloClient.tsx — local rolls, no room/network)
 └── layout.tsx        # 6 fonts + ThemeProvider + manifest
 components/
 ├── dice/             # Dice2D (2D DOM/CSS dice + roll animation) / DiceScene (wrapper) / dice2d.css
@@ -115,6 +118,7 @@ lib/
 ├── auth/             # session.ts (generators + validator) + session-store.ts + membership.ts
 ├── game-engine/      # types / validate / round  (resolve/state-machine/extensions DELETED — see Game engine)
 ├── room/             # invite-code (no 0/1/I/L/O) + dice-rng + resolution (readHands / normalizeState / GAME_TTL)
+├── solo/             # roll.ts — client-side crypto dice for the offline solo mode (no server)
 ├── lua/              # scripts.ts (8 atomic + commit Lua scripts as JS strings) + run.ts
 ├── validation/       # schemas.ts (Zod action union + GameRules)
 ├── audio/            # howl-instance + useDiceAudio
@@ -142,6 +146,20 @@ Generated via ffmpeg synthesis (no external assets). 4 themes × 2 formats at `p
 Remaining (need a human / physical device — can't be done from a dev session):
 
 1. **Real-device gyro test** — need iPhone 14 Pro + Pixel 7 / Android for DeviceMotion validation on hardware
+
+Done (2026-06-10 — round-2 audit + solo mode; branch `fix/playability-audit-r2-2026-06-09`, 79 unit + 32 e2e green ×2):
+
+- **New feature — offline / solo dice-cup mode** (`/solo`): each phone is a fair local dice cup for playing 大话骰 face-to-face (players call bids out loud; app just rolls + shows your own hand). No room/server/network. Reuses Dice2D + themes + shake-to-roll + audio; cover/peek toggle; dice-count (1–8) + 6/8-sides; `lib/solo/roll.ts` uses `crypto.getRandomValues` (local rolls are fine — solo has no protocol adversary, unlike the multiplayer game). Home-page entry link.
+- **16 confirmed bugs** from a multi-agent audit (6 dimension finders + adversarial verify):
+  - **Bid TOCTOU**: bid route validated a fresh read but CAS'd on the client's version → an illegal bid could commit. Now version-gates before validation (like the challenge path).
+  - **startGame race**: a join in the route read→eval window dealt a stale roster (player with no dice). startGame now CASes on the server's OWN read version + the route auto-retries on stale (≤4×) — so a client a beat behind (e.g. right after updateRules) still starts cleanly. **Do NOT CAS start on the client's expectedVersion — it breaks the updateRules→start flow (extensions e2e).**
+  - `/api/session` now per-IP rate-limited (was unthrottled session-minting that also defeated the action limiter); `theme` clamped to an allow-list (`sanitizeTheme`); events-stream key now `EXPIRE`'d on every XADD (the documented 6h TTL was never applied); joinRoom lobby TTL fixed 6h→30m; rejoin now publishes its version bump.
+  - SSE: hook self-reconnects on a non-200 EventSource failure (the browser won't); full-screen disconnect lockout is gated on sync STALENESS not raw SSE status (the 3s poll keeps the game live), rejoin = real reload; stream reassembles complete frames so a keepalive ping can't split a mid-frame chunk.
+  - Client: stale `/api/hand` can't overwrite a new round's dice (AbortController + round tag); whoami retried w/ backoff; trailing-refetch flag; 通杀 filters dead bidders; keyboard challenge respects busy; drawer resyncs toggles on open; silent start/rematch failures surface.
+  - i18n: en bundle reachable via Accept-Language fallback (`lib/i18n.ts`); localized list separator + loading label; 165→182 keys, parity-checked.
+- **e2e hardening**: env-configurable port (`PLAYWRIGHT_PORT`) — `reuseExistingServer` silently grabbed another project's stale :3000 dev server and ran the whole suite against the wrong app; `RATE_LIMIT_DISABLED=1` on the test server (one shared localhost IP trips the per-IP caps); hydration-race-robust nickname fill in helpers (a pre-hydration fill was reset to '' by React → flaky "请输入昵称" / rate-limit at the home stage, a different test each run). Suite now ~38s (was ~1.7m of retry churn).
+- **game-end leave label**: the secondary button only `leave`s (navigates home; leaveRoom transfers ownership) — it never dissolves the room, so the "解散房间/Disband room" label (shown to non-owners too) was relabeled to "离开房间/Leave room"; removed the unused `game.disband` key.
+- **game-engine re-audit (inline)**: the audit's rules-dimension finder produced no output (spend-limit), so `resolveChallenge`/`Pi`/`Tongsha`, `isValidBid` (zhai/break-zhai/转斋/叫1必斋/Palifico/total-dice cap), `prepareNextRound` Palifico setup, and the cjson `normalizeState` boundary were all re-traced by hand — no engine bug found.
 
 Done (2026-06-09 playability audit — the game could not be finished before this pass):
 

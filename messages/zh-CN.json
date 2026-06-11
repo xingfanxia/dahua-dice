@@ -22,7 +22,8 @@
     "enter": "进入",
     "nicknameRequired": "请输入昵称",
     "nicknameTooLong": "昵称最多 20 字",
-    "invalidCode": "邀请码必须 6 位"
+    "invalidCode": "邀请码必须 6 位",
+    "soloMode": "线下 / 单人模式"
   },
   "lobby": {
     "title": "房间 {code}",
@@ -43,6 +44,7 @@
     "modifyRules": "修改规则",
     "startGame": "开始游戏",
     "needMorePlayers": "至少 2 人才能开始",
+    "startFailed": "开始失败，请重试",
     "waitingForHost": "等待房主开始游戏…",
     "leaveRoom": "离开房间",
     "avatarHeader": "选择头像"
@@ -76,7 +78,6 @@
     "nextRound": "下一局",
     "toFinalResult": "查看最终结果",
     "rematch": "再来一局",
-    "disband": "解散房间",
     "waitingFirstBid": "等待第一个叫数…",
     "latestBid": "最新叫数",
     "waitingReveal": "等待揭晓…",
@@ -108,7 +109,8 @@
     "disconnected": "已断开连接",
     "rejoin": "重新加入",
     "actionFailed": "操作失败，请重试",
-    "staleResynced": "状态已更新，请重试"
+    "staleResynced": "状态已更新，请重试",
+    "listSeparator": "、"
   },
   "errors": {
     "network": "网络错误",
@@ -140,6 +142,7 @@
     "title": "规则设定",
     "themeSection": "主题",
     "diceCount": "骰子数",
+    "diceSides": "骰子面数",
     "diceCountHelper": "每人多少颗",
     "appearance": "外观",
     "rules": "规则",
@@ -150,7 +153,6 @@
     "fanpi": "反劈 (Fanpi)",
     "tongsha": "通杀 (Tongsha)",
     "palifico": "Palifico (海外变体)",
-    "diceSides": "骰子面数",
     "avatar": "玩家头像化",
     "avatarHelper": "每个人选自己的骰子套装作 ID",
     "enterAvatarPicker": "进入玩家自选",
@@ -179,5 +181,21 @@
     "wolf": "狼",
     "lion": "狮子",
     "monkey": "猴子"
+  },
+  "solo": {
+    "title": "扔骰子",
+    "subtitle": "线下面对面玩 · 这台手机就是你的骰盅",
+    "roll": "摇骰子",
+    "reroll": "再摇一次",
+    "rolling": "摇动中…",
+    "diceCount": "骰子数量",
+    "sides": "骰子面数",
+    "cover": "盖住",
+    "peek": "查看",
+    "coveredHint": "已盖住 · 点一下查看",
+    "tapToRoll": "点「摇骰子」开始",
+    "shakeHint": "摇一摇手机也能扔",
+    "enableShake": "启用摇一摇",
+    "yourDice": "你的骰子"
   }
 }

@@ -32,12 +32,33 @@ export function CustomizationDrawer({
   const t = useTranslations();
   const { tokens } = useTheme();
   const [diceCount, setDiceCount] = useState<3 | 4 | 5 | 6 | 7>(rules.diceCount);
+  const [diceSides, setDiceSides] = useState<6 | 8>(rules.diceSides);
   const [aceWild, setAceWild] = useState(rules.aceWild);
   const [allowZhai, setAllowZhai] = useState(rules.allowZhai);
   const [chineseExt, setChineseExt] = useState(rules.chineseExtensions);
   const [palifico, setPalifico] = useState(rules.paliFicoVariant);
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
+
+  // Snapshot the live rules into local edit state ONLY on the open transition, so a
+  // rejected mid-game save can't leave stale toggles showing. It must NOT re-run on
+  // every `rules` reference change: refetch() swaps in a fresh state object on any
+  // version bump (a peer joining / changing avatar in the lobby gives a new
+  // `rules` reference even with identical content), which would otherwise clobber
+  // the owner's in-progress unsaved edits. The open-transition guard keeps `rules`
+  // in the deps (exhaustive) while syncing exactly once per open.
+  useEffect(() => {
+    if (open && !wasOpenRef.current) {
+      setDiceCount(rules.diceCount);
+      setDiceSides(rules.diceSides);
+      setAceWild(rules.aceWild);
+      setAllowZhai(rules.allowZhai);
+      setChineseExt(rules.chineseExtensions);
+      setPalifico(rules.paliFicoVariant);
+    }
+    wasOpenRef.current = open;
+  }, [open, rules]);
 
   // Focus management for the modal drawer (spec §17C): move focus in on open,
   // restore to the trigger on close. Tab-trapping is handled in onKeyDown below.
@@ -56,6 +77,7 @@ export function CustomizationDrawer({
     onSaveRules({
       ...rules,
       diceCount,
+      diceSides,
       aceWild,
       allowZhai,
       chineseExtensions: chineseExt,
@@ -163,6 +185,31 @@ export function CustomizationDrawer({
                 >
                   +
                 </button>
+              </div>
+            </section>
+
+            {/* Dice sides (6 / 8) — mirrors the solo page selector; the engine,
+                schema and BidPanel already support the 8-sided variant. */}
+            <section className="flex items-center justify-between">
+              <span>{t('customization.diceSides')}</span>
+              <div className="flex gap-2">
+                {([6, 8] as const).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setDiceSides(s)}
+                    className="min-w-[44px] h-11 rounded-xl text-lg num transition-colors"
+                    aria-pressed={diceSides === s}
+                    aria-label={`${s}`}
+                    style={{
+                      backgroundColor:
+                        diceSides === s ? tokens.colors.primary : tokens.colors.surface,
+                      color: diceSides === s ? tokens.colors.bg : tokens.colors.text,
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
             </section>
 

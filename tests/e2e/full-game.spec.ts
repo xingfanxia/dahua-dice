@@ -62,10 +62,30 @@ test.describe('full game to completion', () => {
         .toBe(true);
       if (!opener) throw new Error('no opener');
       const responder = opener === alice ? bob : alice;
-      await bidBtn(opener).click();
+
+      // Bid with human-style retry: a failed/laggy POST surfaces as an error
+      // flash and the UI expects the player to re-tap — model that instead of
+      // one blind click (a swallowed bid otherwise strands the whole game).
+      const challenge = responder.getByRole('button', { name: '开', exact: true });
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (
+          await bidBtn(opener)
+            .isVisible()
+            .catch(() => false)
+        ) {
+          await bidBtn(opener)
+            .click()
+            .catch(() => {});
+        }
+        try {
+          await expect(challenge).toBeVisible({ timeout: 10_000 });
+          break;
+        } catch {
+          // bid not registered yet — loop re-clicks if the panel still shows
+        }
+      }
 
       // responder challenges immediately → reveal
-      const challenge = responder.getByRole('button', { name: '开', exact: true });
       await expect(challenge).toBeVisible({ timeout: 20_000 });
       await challenge.click();
       await responder.getByRole('button', { name: '确认开!' }).click();

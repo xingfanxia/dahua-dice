@@ -36,7 +36,15 @@ for i = 1, #state.players do
     state.players[i].nick = nick
     state.players[i].avatar = avatar
     state.version = state.version + 1
-    redis.call('SET', stateKey, cjson.encode(state), 'EX', 21600)
+    -- Lobby state lives 30m (matches creation + every other lobby mutation); the
+    -- old 6h here let an idle joined lobby outlive its documented TTL by 5.5h.
+    redis.call('SET', stateKey, cjson.encode(state), 'EX', 1800)
+    -- A rejoin bumps the version, so peers MUST be told or they sit on a stale
+    -- version until the next 3s poll (and any version-CAS they attempt 409s).
+    local rejoinPayload = cjson.encode({type='player_joined', payload={playerId=playerId, nick=nick, avatar=avatar, rejoined=true}, version=state.version})
+    redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', rejoinPayload)
+    redis.call('EXPIRE', 'room:' .. state.code .. ':events', 21600)
+    redis.call('PUBLISH', 'room:' .. state.code .. ':events', rejoinPayload)
     return cjson.encode({ok=true, version=state.version, rejoined=true})
   end
 end
@@ -49,9 +57,10 @@ local newPlayer = {
 }
 table.insert(state.players, newPlayer)
 state.version = state.version + 1
-redis.call('SET', stateKey, cjson.encode(state), 'EX', 21600)
+redis.call('SET', stateKey, cjson.encode(state), 'EX', 1800)
 local payload = cjson.encode({type='player_joined', payload={playerId=playerId, nick=nick, avatar=avatar}, version=state.version})
 redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', payload)
+redis.call('EXPIRE', 'room:' .. state.code .. ':events', 21600)
 redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
 return cjson.encode({ok=true, version=state.version})
 `;
@@ -63,16 +72,24 @@ export const startGame = `
 local stateKey = KEYS[1]
 local handsKey = KEYS[2]
 local playerId = ARGV[1]
+local expectedVersion = tonumber(ARGV[2])
 local raw = redis.call('GET', stateKey)
 if not raw then return cjson.encode({ok=false, reason='no_room'}) end
 local state = cjson.decode(raw)
+-- Version-CAS: the JS layer rolled hands against the roster it read; if a join or
+-- rules change landed in the gap, the version moved and those hands are for a
+-- stale roster — reject so the owner restarts against the live state.
+if state.version ~= expectedVersion then
+  return cjson.encode({ok=false, reason='stale', currentVersion=state.version})
+end
 if state.ownerId ~= playerId then return cjson.encode({ok=false, reason='not_owner'}) end
 if state.phase ~= 'lobby' then return cjson.encode({ok=false, reason='wrong_phase'}) end
 if #state.players < 2 then return cjson.encode({ok=false, reason='need_more_players'}) end
 
--- Replace hands hash atomically with what JS sent us
+-- Replace hands hash atomically with what JS sent us.
+-- ARGV layout: [1]=playerId [2]=expectedVersion then alternating playerId, jsonHand.
 redis.call('DEL', handsKey)
-for i = 2, #ARGV, 2 do
+for i = 3, #ARGV, 2 do
   redis.call('HSET', handsKey, ARGV[i], ARGV[i+1])
 end
 redis.call('EXPIRE', handsKey, 21600)
@@ -95,6 +112,7 @@ state.version = state.version + 1
 redis.call('SET', stateKey, cjson.encode(state), 'EX', 21600)
 local payload = cjson.encode({type='game_started', payload={round=state.round}, version=state.version})
 redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', payload)
+redis.call('EXPIRE', 'room:' .. state.code .. ':events', 21600)
 redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
 return cjson.encode({ok=true, version=state.version})
 `;
@@ -140,6 +158,7 @@ state.version = state.version + 1
 redis.call('SET', stateKey, cjson.encode(state), 'EX', 21600)
 local payload = cjson.encode({type='bid', payload={playerId=playerId, count=count, face=face, isZhai=isZhai}, version=state.version})
 redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', payload)
+redis.call('EXPIRE', 'room:' .. state.code .. ':events', 21600)
 redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
 return cjson.encode({ok=true, version=state.version})
 `;
@@ -162,6 +181,7 @@ end
 redis.call('SET', stateKey, newState, 'EX', ttl)
 local decoded = cjson.decode(newState)
 redis.call('XADD', 'room:' .. cur.code .. ':events', '*', 'data', eventJson)
+redis.call('EXPIRE', 'room:' .. cur.code .. ':events', 21600)
 redis.call('PUBLISH', 'room:' .. cur.code .. ':events', eventJson)
 return cjson.encode({ok=true, version=decoded.version})
 `;
@@ -190,6 +210,7 @@ end
 redis.call('EXPIRE', handsKey, ttl)
 local decoded = cjson.decode(newState)
 redis.call('XADD', 'room:' .. cur.code .. ':events', '*', 'data', eventJson)
+redis.call('EXPIRE', 'room:' .. cur.code .. ':events', 21600)
 redis.call('PUBLISH', 'room:' .. cur.code .. ':events', eventJson)
 return cjson.encode({ok=true, version=decoded.version})
 `;
@@ -217,6 +238,7 @@ state.version = state.version + 1
 redis.call('SET', stateKey, cjson.encode(state), 'EX', 1800)
 local payload = cjson.encode({type='avatar_updated', payload={playerId=playerId, avatar=avatar}, version=state.version})
 redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', payload)
+redis.call('EXPIRE', 'room:' .. state.code .. ':events', 21600)
 redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
 return cjson.encode({ok=true, version=state.version})
 `;
@@ -250,6 +272,7 @@ if state.phase == 'lobby' then
   redis.call('SET', stateKey, cjson.encode(state), 'EX', 1800)
   local payload = cjson.encode({type='player_left', payload={playerId=playerId}, version=state.version})
   redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', payload)
+  redis.call('EXPIRE', 'room:' .. state.code .. ':events', 21600)
   redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
   return cjson.encode({ok=true, version=state.version})
 end
@@ -291,6 +314,7 @@ state.version = state.version + 1
 redis.call('SET', stateKey, cjson.encode(state), 'EX', 21600)
 local payload = cjson.encode({type='player_left', payload={playerId=playerId, gameEnded=aliveCount<=1}, version=state.version})
 redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', payload)
+redis.call('EXPIRE', 'room:' .. state.code .. ':events', 21600)
 redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
 return cjson.encode({ok=true, version=state.version})
 `;
@@ -317,6 +341,7 @@ state.version = state.version + 1
 redis.call('SET', stateKey, cjson.encode(state), 'EX', 1800)
 local payload = cjson.encode({type='rules_updated', payload={}, version=state.version})
 redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', payload)
+redis.call('EXPIRE', 'room:' .. state.code .. ':events', 21600)
 redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
 return cjson.encode({ok=true, version=state.version})
 `;
@@ -351,6 +376,7 @@ redis.call('DEL', handsKey)
 redis.call('SET', stateKey, cjson.encode(state), 'EX', 1800)
 local payload = cjson.encode({type='rematch', payload={}, version=state.version})
 redis.call('XADD', 'room:' .. state.code .. ':events', '*', 'data', payload)
+redis.call('EXPIRE', 'room:' .. state.code .. ':events', 21600)
 redis.call('PUBLISH', 'room:' .. state.code .. ':events', payload)
 return cjson.encode({ok=true, version=state.version})
 `;
