@@ -17,7 +17,9 @@ test.describe('language toggle', () => {
 
     // Switch to English via the toggle.
     await page.getByRole('button', { name: 'English' }).click();
-    await expect(page.getByRole('button', { name: 'Create room' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: 'Create room' })).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.getByRole('button', { name: '创建房间' })).toHaveCount(0);
 
     // Persists across a reload (cookie-backed).

@@ -25,8 +25,14 @@ export function LanguageToggle({ label }: { label?: string }) {
 
   async function pick(code: Locale) {
     if (code === locale) return;
-    await setLocale(code);
-    router.refresh();
+    try {
+      await setLocale(code);
+      router.refresh();
+    } catch (err) {
+      // Loud, not a silent unhandled rejection (repo standard). The action only
+      // fails on a transport error; the UI simply stays in the current language.
+      console.error('[i18n] setLocale failed', err);
+    }
   }
 
   return (
