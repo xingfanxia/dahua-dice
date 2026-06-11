@@ -10,7 +10,7 @@ export type MembershipResult =
 /**
  * Verify the caller is an authenticated member of the room (room.players includes
  * their session.playerId). Used to gate any endpoint that exposes per-room data
- * — full state, hand contents, SSE stream, event replay.
+ * — full state, hand contents, SSE stream.
  *
  * Public discovery (phase + counts) lives at /api/room/[code] and bypasses this.
  */
