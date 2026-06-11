@@ -39,18 +39,25 @@ export function CustomizationDrawer({
   const [palifico, setPalifico] = useState(rules.paliFicoVariant);
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
 
-  // Re-sync local toggle state from the live rules each time the drawer opens, so a
-  // rejected mid-game save (or another owner's rules change arriving via SSE) can't
-  // leave the panel showing toggles that aren't actually in effect.
+  // Snapshot the live rules into local edit state ONLY on the open transition, so a
+  // rejected mid-game save can't leave stale toggles showing. It must NOT re-run on
+  // every `rules` reference change: refetch() swaps in a fresh state object on any
+  // version bump (a peer joining / changing avatar in the lobby gives a new
+  // `rules` reference even with identical content), which would otherwise clobber
+  // the owner's in-progress unsaved edits. The open-transition guard keeps `rules`
+  // in the deps (exhaustive) while syncing exactly once per open.
   useEffect(() => {
-    if (!open) return;
-    setDiceCount(rules.diceCount);
-    setDiceSides(rules.diceSides);
-    setAceWild(rules.aceWild);
-    setAllowZhai(rules.allowZhai);
-    setChineseExt(rules.chineseExtensions);
-    setPalifico(rules.paliFicoVariant);
+    if (open && !wasOpenRef.current) {
+      setDiceCount(rules.diceCount);
+      setDiceSides(rules.diceSides);
+      setAceWild(rules.aceWild);
+      setAllowZhai(rules.allowZhai);
+      setChineseExt(rules.chineseExtensions);
+      setPalifico(rules.paliFicoVariant);
+    }
+    wasOpenRef.current = open;
   }, [open, rules]);
 
   // Focus management for the modal drawer (spec §17C): move focus in on open,
