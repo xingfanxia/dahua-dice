@@ -40,8 +40,11 @@ test.describe('full game to completion', () => {
 
     let gameEnded = false;
     for (let round = 0; round < 12 && !gameEnded; round++) {
-      // whoever holds the turn opens the round with the default (valid) bid
-      let opener: Page | null = null;
+      // whoever holds the turn opens the round with the default (valid) bid.
+      // `null as Page | null` (not `: Page | null = null`) so TS keeps the union:
+      // `opener` is assigned only inside the poll() closure, which CFA doesn't
+      // track, so a plain null init narrows it to `never` after the throw-guard.
+      let opener = null as Page | null;
       await expect
         .poll(
           async () => {

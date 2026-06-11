@@ -54,7 +54,9 @@ test.describe('Palifico (live)', () => {
     for (let round = 0; round < 12 && !sawPalifico && !gameEnded; round++) {
       // Whoever holds the turn opens. Check both screens for the Palifico banner
       // first — it renders inside the opener's BidPanel once the round is live.
-      let opener: Page | null = null;
+      // `null as Page | null` so TS keeps the union past the poll() closure (a plain
+      // null init would narrow `opener` to `never` after the throw-guard).
+      let opener = null as Page | null;
       await expect
         .poll(
           async () => {
