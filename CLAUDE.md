@@ -30,11 +30,11 @@
 | Pub/Sub | Upstash REST `/subscribe/{channel}` SSE pipe |
 | Dice | 2D DOM/CSS renderer (`components/dice/Dice2D` + `dice2d.css`) — transform/opacity tumble, themed via CSS oklch vars, no WebGL/Three.js |
 | Audio | `howler` v2 — 8-slice ffmpeg-synth sprites (collide/shake/reveal/win/lose/click/settle/stinger), 4 themes |
-| i18n | `next-intl` (zh-CN default + en, parity-checked) |
+| i18n | `next-intl` (zh-CN default + en, parity-checked). Default is zh-CN (no Accept-Language auto-switch); English is opt-in via the LanguageToggle (`components/i18n/LanguageToggle.tsx` → `setLocale` server action sets the `locale` cookie). |
 | UI | Tailwind v4 + React local state (no external state lib) |
 | Validation | Zod at API boundaries (`lib/validation/schemas.ts`) + Redis INCR rate limiter (`lib/rate-limit.ts`; 30/min action · 15/min room · 20/min session, all per-IP/session; `RATE_LIMIT_DISABLED=1` opt-out for e2e only) |
 | Lint | Biome v2 (replaces ESLint + Prettier; CSS formatter disabled — Tailwind v4 syntax incompatible) |
-| Test | Vitest (79 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / full-game-to-rematch / solo / 劈 / palifico / 8-sided / axe a11y; 32 tests, chromium + webkit) |
+| Test | Vitest (79 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / full-game-to-rematch / solo / 劈 / palifico / 8-sided / axe a11y; 34 tests, chromium + webkit) |
 
 ## Commands
 

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type DicePhase, DiceScene } from '@/components/dice/DiceScene';
+import { LanguageToggle } from '@/components/i18n/LanguageToggle';
 import { useShakeDetector } from '@/components/shake/useShakeDetector';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { THEME_KEYS } from '@/components/theme/tokens';
@@ -284,6 +285,9 @@ export function SoloClient() {
                 {t(`themes.${k}`)}
               </button>
             ))}
+          </div>
+          <div className="mt-3 flex justify-center">
+            <LanguageToggle label={t('common.language')} />
           </div>
         </footer>
       </div>

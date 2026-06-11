@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
+import { LanguageToggle } from '@/components/i18n/LanguageToggle';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { THEME_KEYS, type ThemeKey } from '@/components/theme/tokens';
 import type { GameRules } from '@/lib/game-engine/types';
@@ -158,6 +159,17 @@ export function CustomizationDrawer({
               </button>
             ))}
           </div>
+        </section>
+
+        {/* Language switcher (always available) */}
+        <section className="flex flex-col gap-2">
+          <h3
+            className="text-xs uppercase tracking-wide"
+            style={{ color: tokens.colors.textMuted }}
+          >
+            {t('common.language')}
+          </h3>
+          <LanguageToggle label={t('common.language')} />
         </section>
 
         {/* Rules (owner only) */}

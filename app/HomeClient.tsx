@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { LanguageToggle } from '@/components/i18n/LanguageToggle';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { THEME_KEYS, THEMES, type ThemeKey } from '@/components/theme/tokens';
 import { unlockAudio } from '@/lib/audio/howl-instance';
@@ -296,6 +297,12 @@ export function HomeClient({
               {displayThemes.map((k) => (
                 <ThemeChip key={k} themeKey={k} active={k === theme} onClick={() => setTheme(k)} />
               ))}
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <span className="font-ui text-[11px] uppercase tracking-[0.16em] text-text-muted">
+                {t('common.language')}
+              </span>
+              <LanguageToggle label={t('common.language')} />
             </div>
           </div>
         </footer>
