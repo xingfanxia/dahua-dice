@@ -146,6 +146,10 @@ Remaining (need a human / physical device — can't be done from a dev session):
 
 1. **Real-device gyro test** — need iPhone 14 Pro + Pixel 7 / Android for DeviceMotion validation on hardware
 
+Planned (2026-06-11 — research done, NOT started):
+
+2. **微信小程序版** — friends-only 体验版路线（零备案/审核/版号；个人主体 15 体验成员 + 15 项目成员/appid）。开在**新 sibling repo** `~/projects/side-projects/dahua-dice-wxapp/`（infra 与 web 版零重叠：Taro 4 = React 18、云开发 CloudBase、`db.watch` 实时同步替代 SSE、`lib/game-engine/` 原样移植进云函数）。完整调研与架构映射：`docs/research/2026-06-11-wechat-miniprogram-port.md`；通用 playbook：`~/.claude/references/wechat-miniprogram-friends-only.md`。CloudBase skill 已装（`.claude/skills/cloudbase` → `.agents/skills/cloudbase`，`Skill(cloudbase)` 调用）。⚠ 注册普通小程序 + 工具类目，勿注册小游戏账号；游戏内永远零真钱元素。
+
 Done (2026-06-11 — dead-code cleanup): removed the unused `/api/events/[code]` since-ID replay endpoint (no caller anywhere — reconnect uses `/full` refetch) and dropped the per-mutation `XADD`+`EXPIRE` to `room:{code}:events` from every Lua script (kept `PUBLISH`, which is a separate Redis namespace and drives the SSE pipe). `room:{code}:events` is now a pure pub/sub channel, no persisted stream. Realtime sync unaffected (verified via the audit harness).
 
 Done (2026-06-10 — round-2 audit + solo mode; branch `fix/playability-audit-r2-2026-06-09`, 79 unit + 32 e2e green ×2):
@@ -197,6 +201,6 @@ Lower-priority / deliberate cuts (documented): app-layer hand encryption (auth-g
 
 - `docs/specs/2026-05-21-dahua-dice-design.md` — 848-line design contract (5→9/10 design-review)
 - `docs/plans/2026-05-21-dahua-dice-plan.md` — 12-phase implementation plan
-- `docs/research/` — 4 subagent research docs (game rules, Upstash, R3F, audio)
+- `docs/research/` — 4 subagent research docs (game rules, Upstash, R3F, audio) + `2026-06-11-wechat-miniprogram-port.md` (小程序版调研：体验版合规路线 + 架构映射 + 开工 checklist)
 - `~/.claude/projects/-Users-xingfanxia-projects/memory/project_dahua_dice.md` — durable agent memory
 - `~/.claude/projects/-Users-xingfanxia-projects/memory/feedback_vercel_team_scope.md` — Vercel scope rule (saved this session)
