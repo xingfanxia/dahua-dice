@@ -1,44 +1,35 @@
 @import "tailwindcss";
 
-@theme inline {
-  --color-bg: var(--theme-bg);
-  --color-surface: var(--theme-surface);
-  --color-primary: var(--theme-primary);
-  --color-accent: var(--theme-accent);
-  --color-text: var(--theme-text);
-  --color-text-muted: var(--theme-text-muted);
-  --color-success: var(--theme-success);
-  --color-danger: var(--theme-danger);
-  --color-dice-face: var(--theme-dice-face);
-  --color-dice-dot: var(--theme-dice-dot);
-  --font-display: var(--theme-font-display);
-  --font-ui: var(--theme-font-ui);
-}
-
-:root {
-  /* fallback before ThemeProvider hydrates — matches modern-minimal default */
-  --theme-bg: oklch(0.12 0.02 250);
-  --theme-surface: oklch(0.18 0.03 250);
-  --theme-primary: oklch(0.7 0.15 230);
-  --theme-accent: oklch(0.75 0.18 50);
-  --theme-text: oklch(0.96 0.02 250);
-  --theme-text-muted: oklch(0.7 0.02 250);
-  --theme-success: oklch(0.7 0.18 145);
-  --theme-danger: oklch(0.65 0.22 25);
-  --theme-dice-face: oklch(0.92 0.02 250);
-  --theme-dice-dot: oklch(0.2 0.02 250);
-  --theme-motion-duration: 200ms;
-  --theme-motion-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
-}
+/* dark/light dual mode (wxapp design language §5.1): the `dark` class on <html>
+   drives every dark: variant. Set pre-hydration by the inline script in
+   app/layout.tsx, kept in sync by ThemeProvider (auto/light/dark + storage). */
+@custom-variant dark (&:where(.dark, .dark *));
 
 html,
 body {
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--color-gray-50);
+  color: var(--color-gray-900);
   min-height: 100dvh; /* NOT 100vh — iOS Safari viewport jump */
-  font-family: var(--font-ui, ui-sans-serif, system-ui);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft YaHei",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+html.dark,
+.dark body {
+  background: var(--color-gray-900);
+  color: var(--color-gray-50);
 }
 
 .safe-top {
@@ -52,10 +43,10 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Per-theme keyboard focus ring (spec §17C). Visible on dark + light themes via
-   the theme primary token; only for keyboard nav, not pointer focus. */
+/* Keyboard focus ring (spec §17C): red-600 accent passes AA on both gray-50 and
+   gray-900 backgrounds; only for keyboard nav, not pointer focus. */
 :focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--color-red-600);
   outline-offset: 2px;
   border-radius: 4px;
 }

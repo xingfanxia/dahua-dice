@@ -52,14 +52,12 @@ test.describe('solo / offline dice cup', () => {
     await page.goto('/solo');
     await page.waitForLoadState('networkidle');
 
-    // Default is 5; decrement to 3. Click at most once per iteration and only
-    // while still above 3, so a pre-hydration no-op is absorbed without ever
-    // overshooting below the target.
-    const dec = page.getByRole('button', { name: '−' });
-    const countDisplay = page.locator('span.num').first();
+    // Default is 5; pick 3 on the count grid (wxapp-style 1-10 grid). Retry the
+    // click until aria-pressed reflects it, absorbing a pre-hydration no-op.
+    const three = page.getByRole('button', { name: '3', exact: true });
     await expect(async () => {
-      if ((await countDisplay.textContent())?.trim() !== '3') await dec.click();
-      await expect(countDisplay).toHaveText('3', { timeout: 500 });
+      await three.click();
+      await expect(three).toHaveAttribute('aria-pressed', 'true', { timeout: 500 });
     }).toPass({ timeout: 15000 });
 
     await page.getByRole('button', { name: /^摇骰子$|^Roll$/ }).click();

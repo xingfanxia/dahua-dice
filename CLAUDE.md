@@ -17,8 +17,8 @@
 3. **Next.js 16 calls it `proxy`, not `middleware`.** File is `proxy.ts` at repo root, export name MUST be `function proxy(req: NextRequest)`. If you write `middleware`, build fails.
 4. **Lua scripts are JS template strings** in `lib/lua/scripts.ts`, NOT `.lua` files. They are now **atomic mutations + thin version-CAS commits only**: `joinRoom` / `startGame` / `placeBid` / `setAvatar` / `leaveRoom` / `rematch` / `commitState` / `commitRound`. Challenge/劈/通杀/nextRound resolution is computed in Node (see Game engine), NOT in Lua. `runScript` in `lib/lua/run.ts` calls `redis.eval`. ⚠ **Redis cjson.encode returns `nil` (not a string) for a table with a SHARED sub-table reference** → always build separate table literals (this silently broke every bid once).
 5. **Dice rolls must be server-side** (`lib/room/dice-rng.ts` uses `crypto.randomInt`). Client UI is decorative — the 2D dice (`components/dice/Dice2D`) tumble then settle on the fetched hand, but the authoritative hand is what the server stores in `room:{code}:hands`.
-6. **Theme tokens live in `components/theme/tokens.ts`**. ThemeProvider sets CSS vars + `data-theme` attr on root. NO hardcoded colors in components; use the tokens.
-7. **Anti-AI-slop applies** (from `~/.claude/CLAUDE.md` design rules): no Inter / Lucide / `100vh` / `#000` / centered hero grids. Use the 4 themes' specific fonts (Space Grotesk / Newsreader / Noto Serif TC / Plus Jakarta), `oklch()` colors, `min-h-[100dvh]`, Phosphor / Heroicons / Radix icons.
+6. **Single design language (2026-06-12 redesign, matches the wxapp sibling)**: neutral Tailwind grays + red-600 accent + amber secondary, dark/light dual mode. `components/theme/ThemeProvider.tsx` = mode context (auto/light/dark, `localStorage['theme-mode']`, `dark` class on `<html>`); pre-paint inline script in `app/layout.tsx` prevents flash. NO per-theme tokens (tokens.ts deleted); style with Tailwind classes + `dark:` variants only.
+7. **Anti-AI-slop applies** (from `~/.claude/CLAUDE.md` design rules): no Lucide / `100vh` / centered hero grids; `min-h-[100dvh]`. Typography is intentionally the system sans stack (wxapp parity — the 4 display fonts were removed 2026-06-12). **Contrast floor**: axe wcag2aa runs in e2e — muted text ≥ gray-500 on light bg, white-on-color buttons need the 600-step shade (red-600 / emerald-700).
 
 ## Tech stack quick ref
 
@@ -28,20 +28,20 @@
 | Deploy | Vercel Fluid Compute (maxDuration 300s Hobby / 800s Pro for SSE) |
 | State | Upstash Redis (HTTP client + Lua eval for CAS) |
 | Pub/Sub | Upstash REST `/subscribe/{channel}` SSE pipe |
-| Dice | 2D DOM/CSS renderer (`components/dice/Dice2D` + `dice2d.css`) — transform/opacity tumble, themed via CSS oklch vars, no WebGL/Three.js |
-| Audio | `howler` v2 — settle = real CC0 sample (Kenney dice-throw-1, always on); other 7 slots = ffmpeg-synth sprites (4 themes) behind `NEXT_PUBLIC_AUDIO_ENABLED` (default off) |
+| Dice | 2D DOM/CSS renderer (`components/dice/Dice2D` + `dice2d.css`) — transform/opacity tumble, white die + gray-900 pips in both modes, no WebGL/Three.js |
+| Audio | `howler` v2 — settle = real CC0 sample (Kenney dice-throw-1, always on); other 7 slots = ffmpeg-synth sprites behind `NEXT_PUBLIC_AUDIO_ENABLED` (default off; only the `modern` pack is wired since the 4-theme removal) |
 | i18n | `next-intl` (zh-CN default + en, parity-checked). Default is zh-CN (no Accept-Language auto-switch); English is opt-in via the LanguageToggle (`components/i18n/LanguageToggle.tsx` → `setLocale` server action sets the `locale` cookie). |
 | UI | Tailwind v4 + React local state (no external state lib) |
 | Validation | Zod at API boundaries (`lib/validation/schemas.ts`) + Redis INCR rate limiter (`lib/rate-limit.ts`; 30/min action · 15/min room · 20/min session, all per-IP/session; `RATE_LIMIT_DISABLED=1` opt-out for e2e only) |
 | Lint | Biome v2 (replaces ESLint + Prettier; CSS formatter disabled — Tailwind v4 syntax incompatible) |
-| Test | Vitest (79 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / full-game-to-rematch / solo / 劈 / palifico / 8-sided / axe a11y; 34 tests, chromium + webkit) |
+| Test | Vitest (83 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / full-game-to-rematch / solo / 劈 / palifico / axe a11y; 32 tests, chromium + webkit — dice-sides spec removed with the 8-sided UI option) |
 
 ## Commands
 
 ```bash
 pnpm dev            # http://localhost:3000
 pnpm build          # production build (~1.5-2s)
-pnpm test           # 79 unit + integration tests
+pnpm test           # 83 unit + integration tests
 pnpm e2e            # Playwright e2e (auto-starts a dev server); browsers: playwright install chromium webkit
 PLAYWRIGHT_PORT=3100 pnpm e2e   # use when :3000 is taken by another project's dev server (reuseExistingServer would grab it)
 pnpm lint:fix       # Biome autofix
@@ -106,12 +106,12 @@ app/
 ├── api/              # Route Handlers (server-only)
 ├── room/[code]/      # Lobby + game (RoomClient.tsx is the client component)
 ├── solo/             # Offline solo dice-cup (SoloClient.tsx — local rolls, no room/network)
-└── layout.tsx        # 6 fonts + ThemeProvider + manifest
+└── layout.tsx        # system font stack + ThemeProvider + pre-paint dark-mode script + manifest
 components/
 ├── dice/             # Dice2D (2D DOM/CSS dice + roll animation) / DiceScene (wrapper) / dice2d.css
 ├── game/             # BidPanel / PlayerRing / BidChain / RevealStage / AvatarBadge / useRoomEvents
-├── theme/            # tokens.ts + ThemeProvider
-├── customization/    # CustomizationDrawer (themes + dice count + rules toggles incl 中式扩展) / AvatarPicker
+├── theme/            # ThemeProvider (dark/light mode context) + ThemeModeToggle pill
+├── customization/    # CustomizationDrawer (dark/light mode + language + dice count 3-10 grid + rules toggles incl 中式扩展) / AvatarPicker
 └── shake/            # useShakeDetector (DeviceMotion + iOS perm; auto-grants on Android)
 lib/
 ├── auth/             # session.ts (generators + validator) + session-store.ts + membership.ts
@@ -133,7 +133,7 @@ messages/             # zh-CN.json + en.json (parity-checked)
 
 > **Synth sprites are DISABLED by default** (`AUDIO_ENABLED` in `lib/audio/useDiceAudio.ts`, gated on `NEXT_PUBLIC_AUDIO_ENABLED=true`) — they aren't good enough to ship; when off, the sprite sheet is never fetched and every sprite helper no-ops. **Exception: `settle` plays a real CC0 sample always-on** — Kenney casino-audio `dice-throw-1` (CC0 1.0, kenney.nl/assets/casino-audio) at `public/audio/dice-throw.{mp3,webm}`, fired by `onAllSettled` in Room + Solo. The wxapp sibling repo uses the same sample（音感一致）.
 
-Generated via ffmpeg synthesis (no external assets). 4 themes × 2 formats at `public/audio/{modern,classic,hk,cartoon}.{mp3,webm}`. Total ~340KB across all themes.
+Generated via ffmpeg synthesis (no external assets). 4 packs × 2 formats at `public/audio/{modern,classic,hk,cartoon}.{mp3,webm}` (~340KB total); since the 2026-06-12 theme removal only `modern` is wired in `lib/audio/useDiceAudio.ts`.
 
 - **Regenerate**: `node scripts/audio/generate-sprites.mjs`
 - **Smoke-test** (browser decode + duration drift check): `node scripts/audio/smoke.mjs` (needs `pnpm dev` running)
@@ -149,6 +149,14 @@ Remaining (need a human / physical device — can't be done from a dev session):
 Planned (2026-06-11 — research done, NOT started):
 
 2. **微信小程序版** — friends-only 体验版路线（零备案/审核/版号；个人主体 15 体验成员 + 15 项目成员/appid）。开在**新 sibling repo** `~/projects/side-projects/dahua-dice-wxapp/`（infra 与 web 版零重叠：Taro 4 = React 18、云开发 CloudBase、`db.watch` 实时同步替代 SSE、`lib/game-engine/` 原样移植进云函数）。完整调研与架构映射：`docs/research/2026-06-11-wechat-miniprogram-port.md`；通用 playbook：`~/.claude/references/wechat-miniprogram-friends-only.md`。CloudBase skill 已装（`.claude/skills/cloudbase` → `.agents/skills/cloudbase`，`Skill(cloudbase)` 调用）。⚠ 注册普通小程序 + 工具类目，勿注册小游戏账号；游戏内永远零真钱元素。
+
+Done (2026-06-12 — UI/UX redesign to wxapp design language; branch `redesign/match-wxapp`, 83 unit + 32 e2e green):
+
+- **4-theme system removed** (modern-minimal / classic-bar / hk-neon / cartoon, tokens.ts, 5 Google fonts, theme switcher UI, `themes.*` i18n keys) → single wxapp design language: gray-50/900 surfaces, white/gray-800 cards, red-600 primary, amber secondary, emerald-700 bid/share. All `style={{tokens.colors.*}}` inline styles → Tailwind classes.
+- **dark/light dual mode**: follow-system + manual 3-state pill (跟随系统→深色→浅色, `localStorage['theme-mode']`, wxapp `useThemeMode` parity); `dark` class on `<html>` + Tailwind v4 `@custom-variant dark`; pre-paint inline script kills the flash; `viewport.themeColor` light/dark pair.
+- **wxapp feature parity ports** (its commits 71912fb/1e4b43e/04f60f3/dde8bd6): hand-summary chips under the dice (pure per-face counts incl 1s — `lib/game/hand-summary.ts`, keep in sync with wxapp `lib/handSummary.ts`); diceCount 3-10 grid in the drawer (Zod widened to 10 in lockstep with the wxapp cloud fn); 8-sided UI option cut from drawer+solo (engine/schema still accept 6|8; `dice-sides.spec` removed with it); solo count grid 1-10; dice 60→72px.
+- **a11y kept** (wxapp has none of this, web must): keyboard play, ARIA roles/labels, focus trap, reduced-motion, 44px targets, axe wcag2aa green — palette darkened one step where wxapp's raw shades fail 4.5:1 (red-500→600 buttons, emerald-600→700, gray-400→500/600 muted text, amber-600→700/800).
+- Home `theme` no longer sent to `/api/room`//api/session` (server `sanitizeTheme` defaults it; backend untouched).
 
 Done (2026-06-11 — dead-code cleanup): removed the unused `/api/events/[code]` since-ID replay endpoint (no caller anywhere — reconnect uses `/full` refetch) and dropped the per-mutation `XADD`+`EXPIRE` to `room:{code}:events` from every Lua script (kept `PUBLISH`, which is a separate Redis namespace and drives the SSE pipe). `room:{code}:events` is now a pure pub/sub channel, no persisted stream. Realtime sync unaffected (verified via the audit harness).
 

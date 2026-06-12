@@ -35,11 +35,9 @@ test.describe('Palifico (live)', () => {
     const code = await createRoom(alice, 'Alice');
     await joinViaInvite(bob, code, 'Bob');
 
-    // Owner opens settings → diceCount 5→3 (faster attrition) → enable Palifico → save.
+    // Owner opens settings → diceCount 3 (faster attrition) → enable Palifico → save.
     await alice.getByRole('button', { name: '设置' }).click();
-    const dec = alice.getByRole('button', { name: '−' });
-    await dec.click();
-    await dec.click(); // 5 → 4 → 3
+    await alice.getByRole('button', { name: '3', exact: true }).click();
     await alice.getByRole('switch', { name: /Palifico/ }).click();
     await alice.getByRole('button', { name: '保存' }).click();
 

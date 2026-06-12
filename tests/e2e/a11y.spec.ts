@@ -19,9 +19,11 @@ test.describe('accessibility (axe)', () => {
     expect(results.violations).toEqual([]);
   });
 
-  test('home join mode has no WCAG A/AA violations', async ({ page }) => {
+  test('home with filled join code has no WCAG A/AA violations', async ({ page }) => {
+    // The invite-code row is always visible (wxapp-aligned layout); scan with a
+    // filled code so the enabled 进入 button state is covered too.
     await page.goto('/');
-    await page.getByRole('button', { name: '加入房间' }).click();
+    await page.getByPlaceholder(/邀请码|invite code/).fill('ABCDEF');
     const results = await scan(page);
     expect(results.violations).toEqual([]);
   });

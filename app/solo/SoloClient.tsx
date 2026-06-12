@@ -6,24 +6,21 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { type DicePhase, DiceScene } from '@/components/dice/DiceScene';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
 import { useShakeDetector } from '@/components/shake/useShakeDetector';
-import { useTheme } from '@/components/theme/ThemeProvider';
-import { THEME_KEYS } from '@/components/theme/tokens';
+import { ThemeModeToggle } from '@/components/theme/ThemeModeToggle';
 import { unlockAudio } from '@/lib/audio/howl-instance';
 import { useDiceAudio } from '@/lib/audio/useDiceAudio';
+import { summarizeHand } from '@/lib/game/hand-summary';
 import { rollDiceClient } from '@/lib/solo/roll';
 
-const MIN_DICE = 1;
-const MAX_DICE = 8;
+const DICE_COUNTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // wxapp solo grid
 const ROLL_COOLDOWN_MS = 700; // ignore shake re-triggers right after a roll
 
 export function SoloClient() {
   const t = useTranslations();
   const router = useRouter();
-  const { theme, setTheme, tokens } = useTheme();
   const audio = useDiceAudio();
 
   const [diceCount, setDiceCount] = useState(5);
-  const [sides, setSides] = useState<6 | 8>(6);
   const [hand, setHand] = useState<number[] | null>(null);
   const [phase, setPhase] = useState<DicePhase>('idle');
   const [covered, setCovered] = useState(false);
@@ -44,7 +41,9 @@ export function SoloClient() {
     if (rollingRef.current) return;
     rollingRef.current = true;
     lastRollAt.current = Date.now();
-    const next = rollDiceClient(diceCount, sides);
+    // Fixed 6 faces (wxapp parity — the 8-sided option was cut from the UI;
+    // rollDiceClient itself still supports 8 for engine compatibility).
+    const next = rollDiceClient(diceCount, 6);
     setCovered(false);
     // Clear first so Dice2D sees a null→faces transition and re-tumbles even when
     // the new hand happens to equal the previous one (mirrors the room's per-round
@@ -57,7 +56,7 @@ export function SoloClient() {
       setPhase('settled');
       rollingRef.current = false;
     }, 60);
-  }, [diceCount, sides]);
+  }, [diceCount]);
 
   // Shake-to-roll. The detector already debounces a single shake, but a vigorous
   // shake can fire twice — the cooldown stops a double roll, and rollingRef stops
@@ -72,81 +71,73 @@ export function SoloClient() {
   });
 
   const hasHand = !!hand && hand.length > 0;
+  const summaryRows = hasHand ? summarizeHand(hand as number[]) : [];
 
   return (
-    <main className="relative flex min-h-[100dvh] flex-col overflow-hidden">
-      {/* ambient backdrop — same radial wash as home, themed */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10"
-        style={{
-          background: `radial-gradient(ellipse at 18% 12%, color-mix(in oklch, ${tokens.colors.accent} 18%, transparent), transparent 55%),
-            radial-gradient(ellipse at 82% 92%, color-mix(in oklch, ${tokens.colors.primary} 14%, transparent), transparent 60%),
-            ${tokens.colors.bg}`,
-        }}
-      />
-
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 pt-[calc(env(safe-area-inset-top)+3vh)] pb-8 safe-bottom">
+    <main className="flex min-h-[100dvh] flex-col bg-gray-50 dark:bg-gray-900">
+      <div className="safe-bottom mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-5 pb-8 pt-[calc(env(safe-area-inset-top)+1.5rem)]">
         {/* Header */}
         <header className="flex items-center justify-between">
           <button
             type="button"
             onClick={() => router.push('/')}
-            className="min-h-[44px] min-w-[44px] rounded-lg text-sm transition-colors"
-            style={{ color: tokens.colors.textMuted }}
+            className="min-h-[44px] min-w-[44px] rounded-lg text-sm text-gray-500 transition-colors dark:text-gray-400"
             aria-label={t('common.back')}
           >
             ← {t('common.back')}
           </button>
-          <div className="text-right">
-            <h1 className="font-display text-2xl" style={{ color: tokens.colors.text }}>
-              {t('solo.title')}
-            </h1>
-          </div>
+          <ThemeModeToggle />
         </header>
-        <p className="mt-1 font-ui text-xs" style={{ color: tokens.colors.textMuted }}>
-          {t('solo.subtitle')}
-        </p>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">{t('solo.title')}</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('solo.subtitle')}</p>
+        </div>
 
         {/* Dice cup */}
-        <div
-          className="relative mt-6 flex aspect-square w-full items-center justify-center overflow-hidden rounded-3xl"
-          style={{ backgroundColor: tokens.colors.surface }}
-        >
-          {covered && hasHand ? (
-            <button
-              type="button"
-              onClick={() => setCovered(false)}
-              className="flex h-full w-full flex-col items-center justify-center gap-3"
-              aria-label={t('solo.coveredHint')}
-            >
-              <span className="text-6xl" aria-hidden>
-                🥤
-              </span>
-              <span className="font-ui text-sm" style={{ color: tokens.colors.textMuted }}>
-                {t('solo.coveredHint')}
-              </span>
-            </button>
-          ) : hasHand || phase === 'rolling' ? (
+        {covered && hasHand ? (
+          <button
+            type="button"
+            onClick={() => setCovered(false)}
+            className="flex h-40 w-full flex-col items-center justify-center gap-3 rounded-2xl bg-white dark:bg-gray-800"
+            aria-label={t('solo.coveredHint')}
+          >
+            <span className="text-5xl" aria-hidden>
+              🥤
+            </span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {t('solo.coveredHint')}
+            </span>
+          </button>
+        ) : hasHand || phase === 'rolling' ? (
+          <div className="flex w-full flex-col items-center gap-2 rounded-2xl bg-white py-4 dark:bg-gray-800">
             <DiceScene
               diceCount={diceCount}
               phase={phase}
               hand={covered ? null : hand}
-              sides={sides}
               onCollision={(force) => audio.collide('dice', force)}
               onAllSettled={() => audio.settle()}
             />
-          ) : (
-            <div className="flex flex-col items-center gap-3 px-6 text-center">
-              <span className="text-6xl" aria-hidden>
-                🎲
-              </span>
-              <span className="font-ui text-sm" style={{ color: tokens.colors.textMuted }}>
-                {t('solo.tapToRoll')}
-              </span>
-            </div>
-          )}
-        </div>
+            {summaryRows.length > 0 && (
+              <div className="flex flex-wrap items-center justify-center gap-2 px-3 pb-1">
+                {summaryRows.map((row) => (
+                  <span
+                    key={row}
+                    className="rounded-lg bg-gray-100 px-2.5 py-1 text-base font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                  >
+                    {row}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex h-40 w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-gray-300 px-6 text-center dark:border-gray-600">
+            <span className="text-5xl" aria-hidden>
+              🎲
+            </span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">{t('solo.tapToRoll')}</span>
+          </div>
+        )}
 
         {/* Own hand for screen readers */}
         {hasHand && !covered && (
@@ -155,140 +146,69 @@ export function SoloClient() {
           </p>
         )}
 
-        {/* Controls */}
-        <div className="mt-6 flex flex-col gap-4">
-          {/* dice count */}
-          <div className="flex items-center justify-between">
-            <span
-              className="font-ui text-xs uppercase tracking-wide"
-              style={{ color: tokens.colors.textMuted }}
-            >
-              {t('solo.diceCount')}
-            </span>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setDiceCount((c) => Math.max(MIN_DICE, c - 1))}
-                disabled={diceCount <= MIN_DICE}
-                className="h-11 w-11 rounded-full text-xl font-medium disabled:opacity-30"
-                style={{ backgroundColor: tokens.colors.bg, color: tokens.colors.text }}
-                aria-label="−"
-              >
-                −
-              </button>
-              <span
-                className="num min-w-[2ch] text-center text-2xl"
-                style={{ color: tokens.colors.text }}
-              >
-                {diceCount}
-              </span>
-              <button
-                type="button"
-                onClick={() => setDiceCount((c) => Math.min(MAX_DICE, c + 1))}
-                disabled={diceCount >= MAX_DICE}
-                className="h-11 w-11 rounded-full text-xl font-medium disabled:opacity-30"
-                style={{ backgroundColor: tokens.colors.bg, color: tokens.colors.text }}
-                aria-label="+"
-              >
-                +
-              </button>
-            </div>
-          </div>
-
-          {/* sides */}
-          <div className="flex items-center justify-between">
-            <span
-              className="font-ui text-xs uppercase tracking-wide"
-              style={{ color: tokens.colors.textMuted }}
-            >
-              {t('solo.sides')}
-            </span>
-            <div className="flex gap-2">
-              {([6, 8] as const).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setSides(s)}
-                  className="min-h-[44px] min-w-[56px] rounded-xl font-display text-lg transition-colors"
-                  aria-pressed={sides === s}
-                  style={{
-                    backgroundColor: sides === s ? tokens.colors.primary : tokens.colors.bg,
-                    color: sides === s ? tokens.colors.bg : tokens.colors.text,
-                  }}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Roll + cover */}
-          <div className="flex gap-3">
+        {/* Roll + cover */}
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={roll}
+            className="flex-1 rounded-2xl bg-red-600 py-4 text-base font-medium text-white transition-opacity active:scale-[0.99]"
+          >
+            {hasHand ? t('solo.reroll') : t('solo.roll')}
+          </button>
+          {hasHand && (
             <button
               type="button"
-              onClick={roll}
-              className="flex-1 rounded-2xl py-4 font-medium transition-opacity active:scale-[0.99]"
-              style={{ backgroundColor: tokens.colors.success, color: tokens.colors.bg }}
+              onClick={() => setCovered((c) => !c)}
+              className="min-w-[88px] rounded-2xl bg-white py-4 font-medium text-gray-700 transition-colors dark:bg-gray-800 dark:text-gray-300"
+              aria-pressed={covered}
             >
-              {hasHand ? t('solo.reroll') : t('solo.roll')}
+              {covered ? t('solo.peek') : t('solo.cover')}
             </button>
-            {hasHand && (
-              <button
-                type="button"
-                onClick={() => setCovered((c) => !c)}
-                className="min-w-[88px] rounded-2xl py-4 font-medium transition-colors"
-                style={{
-                  backgroundColor: tokens.colors.bg,
-                  color: tokens.colors.text,
-                  border: `1px solid ${tokens.colors.textMuted}44`,
-                }}
-                aria-pressed={covered}
-              >
-                {covered ? t('solo.peek') : t('solo.cover')}
-              </button>
-            )}
-          </div>
-
-          {/* shake hint / enable */}
-          {permission === 'granted' ? (
-            <p className="text-center font-ui text-xs" style={{ color: tokens.colors.textMuted }}>
-              {t('solo.shakeHint')}
-            </p>
-          ) : permission === 'unknown' ? (
-            <button
-              type="button"
-              onClick={() => requestPermission()}
-              className="text-center font-ui text-xs underline"
-              style={{ color: tokens.colors.textMuted }}
-            >
-              {t('solo.enableShake')}
-            </button>
-          ) : null}
+          )}
         </div>
 
-        {/* footer theme chips — keep solo usable standalone */}
-        <footer className="mt-auto pt-8">
-          <div className="flex flex-wrap justify-center gap-2">
-            {THEME_KEYS.map((k) => (
+        {/* dice count grid (wxapp solo: 1-10, fixed 6 faces) */}
+        <div className="flex flex-col gap-2.5 rounded-2xl bg-white p-4 dark:bg-gray-800">
+          <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            {t('solo.diceCount')}
+          </span>
+          <div className="grid grid-cols-5 gap-2">
+            {DICE_COUNTS.map((n) => (
               <button
-                key={k}
+                key={n}
                 type="button"
-                onClick={() => setTheme(k)}
-                className="rounded-full border px-3 py-1.5 font-ui text-xs transition-colors"
-                style={{
-                  borderColor:
-                    k === theme ? `${tokens.colors.text}44` : `${tokens.colors.textMuted}33`,
-                  backgroundColor: k === theme ? `${tokens.colors.text}10` : 'transparent',
-                  color: k === theme ? tokens.colors.text : tokens.colors.textMuted,
-                }}
+                onClick={() => setDiceCount(n)}
+                aria-pressed={diceCount === n}
+                className={`num min-h-[44px] rounded-xl text-base transition-colors ${
+                  diceCount === n
+                    ? 'bg-red-600 font-medium text-white'
+                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                }`}
               >
-                {t(`themes.${k}`)}
+                {n}
               </button>
             ))}
           </div>
-          <div className="mt-3 flex justify-center">
-            <LanguageToggle label={t('common.language')} />
-          </div>
+        </div>
+
+        {/* shake hint / enable */}
+        {permission === 'granted' ? (
+          <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+            {t('solo.shakeHint')}
+          </p>
+        ) : permission === 'unknown' ? (
+          <button
+            type="button"
+            onClick={() => requestPermission()}
+            className="min-h-[44px] text-center text-xs text-gray-500 underline dark:text-gray-400"
+          >
+            {t('solo.enableShake')}
+          </button>
+        ) : null}
+
+        {/* footer */}
+        <footer className="mt-auto flex justify-center pt-6">
+          <LanguageToggle label={t('common.language')} />
         </footer>
       </div>
     </main>

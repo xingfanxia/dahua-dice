@@ -1,7 +1,6 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useTheme } from '@/components/theme/ThemeProvider';
 import { AVATAR_OPTIONS, avatarHue, DEFAULT_AVATAR } from '@/lib/avatars';
 
 /**
@@ -22,15 +21,11 @@ export function AvatarPicker({
   disabled?: boolean;
 }) {
   const t = useTranslations();
-  const { tokens } = useTheme();
   const hue = avatarHue(seed);
 
   return (
-    <fieldset className="flex flex-col gap-2 border-0 p-0 m-0">
-      <legend
-        className="text-xs uppercase tracking-wide mb-2"
-        style={{ color: tokens.colors.textMuted }}
-      >
+    <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
+      <legend className="mb-2 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
         {t('lobby.avatarHeader')}
       </legend>
       <div className="grid grid-cols-6 gap-2">
@@ -44,18 +39,15 @@ export function AvatarPicker({
               aria-label={t(`avatars.${o.id}`)}
               disabled={disabled}
               onClick={() => onSelect(o.id)}
-              className="flex aspect-square items-center justify-center rounded-xl text-xl transition-transform disabled:opacity-40"
-              style={{
-                backgroundColor:
-                  o.id === DEFAULT_AVATAR ? `oklch(0.55 0.12 ${hue})` : tokens.colors.surface,
-                border: `2px solid ${selected ? tokens.colors.primary : 'transparent'}`,
-                transform: selected ? 'scale(1.05)' : 'scale(1)',
-              }}
+              className={`flex aspect-square items-center justify-center rounded-xl border-2 text-xl transition-transform disabled:opacity-40 ${
+                selected ? 'scale-105 border-red-600' : 'border-transparent'
+              } ${o.id === DEFAULT_AVATAR ? '' : 'bg-gray-100 dark:bg-gray-700'}`}
+              style={
+                o.id === DEFAULT_AVATAR ? { backgroundColor: `oklch(0.55 0.12 ${hue})` } : undefined
+              }
             >
               {o.id === DEFAULT_AVATAR ? (
-                <span className="num font-semibold text-base" style={{ color: 'white' }}>
-                  {seat}
-                </span>
+                <span className="num text-base font-semibold text-white">{seat}</span>
               ) : (
                 o.glyph
               )}

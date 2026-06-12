@@ -7,9 +7,8 @@ import './dice2d.css';
 /**
  * 2D animated dice renderer. DOM/CSS only — no WebGL, no Three.js.
  * Renders the player's own dice as rounded squares with standard d6 pips,
- * tumbling on a new roll then settling on their final faces. Themed entirely
- * via CSS custom properties (--theme-dice-face / --theme-dice-dot / etc.),
- * so oklch values are used directly with no color conversion.
+ * tumbling on a new roll then settling on their final faces. Light/dark
+ * styling lives in dice2d.css (html.dark selector), no per-theme tokens.
  */
 
 export type DicePhase = 'idle' | 'rolling' | 'settled' | 'revealed';
@@ -53,7 +52,7 @@ const TUMBLE_MS = 900; // total tumble duration before the first die settles
 const STAGGER_MS = 120; // delay between successive dice settling
 const CYCLE_MS = 80; // how often a tumbling die's face flickers
 const POP_MS = 220; // settle scale-pop window
-const DIE_PX = 60; // rendered die size
+const DIE_PX = 72; // rendered die size (bumped with the wxapp's 真机 "too small" feedback)
 
 const randomFace = (sides: number) => 1 + Math.floor(Math.random() * sides);
 
@@ -75,7 +74,7 @@ function DieFace({ face, sides, popping }: { face: number; sides: number; poppin
         <svg viewBox="0 0 100 100" className="dice2d-pips" aria-hidden="true">
           <title>{face}</title>
           {pips.map(([cx, cy]) => (
-            <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={9} fill="var(--theme-dice-dot)" />
+            <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={9} className="dice2d-pip" />
           ))}
         </svg>
       ) : (
