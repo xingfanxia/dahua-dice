@@ -10,7 +10,7 @@ export type Bid = {
 };
 
 export type GameRules = {
-  diceCount: 3 | 4 | 5 | 6 | 7;
+  diceCount: 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
   aceWild: boolean; // 1 点是否万能 (only when not in zhai round)
   allowZhai: boolean;
   startingBidFactor: number; // default 1.5 → ceil(1.5 × alivePlayers)
