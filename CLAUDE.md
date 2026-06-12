@@ -29,7 +29,7 @@
 | State | Upstash Redis (HTTP client + Lua eval for CAS) |
 | Pub/Sub | Upstash REST `/subscribe/{channel}` SSE pipe |
 | Dice | 2D DOM/CSS renderer (`components/dice/Dice2D` + `dice2d.css`) — transform/opacity tumble, themed via CSS oklch vars, no WebGL/Three.js |
-| Audio | `howler` v2 — 8-slice ffmpeg-synth sprites (collide/shake/reveal/win/lose/click/settle/stinger), 4 themes |
+| Audio | `howler` v2 — settle = real CC0 sample (Kenney dice-throw-1, always on); other 7 slots = ffmpeg-synth sprites (4 themes) behind `NEXT_PUBLIC_AUDIO_ENABLED` (default off) |
 | i18n | `next-intl` (zh-CN default + en, parity-checked). Default is zh-CN (no Accept-Language auto-switch); English is opt-in via the LanguageToggle (`components/i18n/LanguageToggle.tsx` → `setLocale` server action sets the `locale` cookie). |
 | UI | Tailwind v4 + React local state (no external state lib) |
 | Validation | Zod at API boundaries (`lib/validation/schemas.ts`) + Redis INCR rate limiter (`lib/rate-limit.ts`; 30/min action · 15/min room · 20/min session, all per-IP/session; `RATE_LIMIT_DISABLED=1` opt-out for e2e only) |
@@ -131,7 +131,7 @@ messages/             # zh-CN.json + en.json (parity-checked)
 
 ## Audio sprites
 
-> **Audio is DISABLED by default** (`AUDIO_ENABLED` in `lib/audio/useDiceAudio.ts`, gated on `NEXT_PUBLIC_AUDIO_ENABLED=true`). The synth SFX aren't good enough to ship yet; when off, the sprite sheet is never fetched and every play helper no-ops. Re-enable by setting the env var (ideally after dropping in real CC0 samples).
+> **Synth sprites are DISABLED by default** (`AUDIO_ENABLED` in `lib/audio/useDiceAudio.ts`, gated on `NEXT_PUBLIC_AUDIO_ENABLED=true`) — they aren't good enough to ship; when off, the sprite sheet is never fetched and every sprite helper no-ops. **Exception: `settle` plays a real CC0 sample always-on** — Kenney casino-audio `dice-throw-1` (CC0 1.0, kenney.nl/assets/casino-audio) at `public/audio/dice-throw.{mp3,webm}`, fired by `onAllSettled` in Room + Solo. The wxapp sibling repo uses the same sample（音感一致）.
 
 Generated via ffmpeg synthesis (no external assets). 4 themes × 2 formats at `public/audio/{modern,classic,hk,cartoon}.{mp3,webm}`. Total ~340KB across all themes.
 
@@ -195,7 +195,7 @@ Done (2026-05-29 dice rebuild + gameplay UX fix — commits on `main`):
 - **Audio**: richer synthesis (percussive transient+body+decay, 11-clack rattle, per-segment peak-normalize).
 - **e2e**: added `player2-flow.spec.ts` — the regression the happy-path missed (player 2 COUNTER-BIDS, both see own dice, round advances). 16 e2e green.
 
-Lower-priority / deliberate cuts (documented): app-layer hand encryption (auth-gating is sufficient — see spec §17), `Save-Data`, full forced-colors theming, orthographic camera (perspective kept), curated CC0 audio (ffmpeg-synth ships).
+Lower-priority / deliberate cuts (documented): app-layer hand encryption (auth-gating is sufficient — see spec §17), `Save-Data`, full forced-colors theming, orthographic camera (perspective kept), curated CC0 audio for the remaining 7 sprite slots (settle got a real CC0 sample 2026-06-12; synth sprites stay off by default).
 
 ## Reference docs
 
