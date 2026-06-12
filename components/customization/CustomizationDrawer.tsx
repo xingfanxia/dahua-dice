@@ -32,7 +32,7 @@ export function CustomizationDrawer({
 }) {
   const t = useTranslations();
   const { tokens } = useTheme();
-  const [diceCount, setDiceCount] = useState<3 | 4 | 5 | 6 | 7>(rules.diceCount);
+  const [diceCount, setDiceCount] = useState<GameRules['diceCount']>(rules.diceCount);
   const [diceSides, setDiceSides] = useState<6 | 8>(rules.diceSides);
   const [aceWild, setAceWild] = useState(rules.aceWild);
   const [allowZhai, setAllowZhai] = useState(rules.allowZhai);
