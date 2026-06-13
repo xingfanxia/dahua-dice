@@ -434,4 +434,27 @@ describe('endMode house rules (#2)', () => {
     expect(r.outcome.gameEnded).toBe(false);
     expect(r.outcome.winnerIdx).toBe(-1);
   });
+
+  it('score: a departed (alive:false) player with low losses is NOT crowned winner', () => {
+    const s = makeState({
+      players: [
+        { id: 'p1', nick: 'A', avatar: 'numeric', diceLeft: 5, alive: true, lossCount: 2 },
+        // p2 left mid-game: alive false, dice 0, but lossCount frozen at 0 (lowest).
+        { id: 'p2', nick: 'B', avatar: 'numeric', diceLeft: 0, alive: false, lossCount: 0 },
+        { id: 'p3', nick: 'C', avatar: 'numeric', diceLeft: 5, alive: true, lossCount: 1 },
+      ],
+      currentTurnIdx: 2,
+      round: 3,
+      lastBid: { count: 6, face: 4, isZhai: false },
+      bidChain: [{ playerId: 'p1', bid: { count: 6, face: 4, isZhai: false } }],
+      rules: { ...DEFAULT_RULES, endMode: 'score', scoreRounds: 3 },
+    });
+    // p3 challenges 6×4; with p2 gone actual = p1's 3 < 6 → p1 loses (lossCount 2→3).
+    const r = resolveChallenge(s, HANDS, 'p3');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.outcome.gameEnded).toBe(true);
+    // Among the living (p1=3, p3=1), p3 wins — NOT the departed p2 (idx 1) despite its 0 losses.
+    expect(r.outcome.winnerIdx).toBe(2);
+  });
 });

@@ -243,7 +243,7 @@ export function CustomizationDrawer({
                       {t(`customization.endMode_${m}`)}
                     </span>
                     <span
-                      className={`block text-xs ${endMode === m ? 'text-red-50' : 'text-gray-500 dark:text-gray-400'}`}
+                      className={`block text-xs ${endMode === m ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`}
                     >
                       {t(`customization.endMode_${m}_desc`)}
                     </span>

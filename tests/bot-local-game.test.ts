@@ -12,7 +12,12 @@ import {
 } from '@/lib/bot/local-game';
 
 function freshGame(): BotGame {
-  return createBotGame({ humanNick: 'You', humanAvatar: 'numeric', botNick: 'CPU', botAvatar: 'numeric' });
+  return createBotGame({
+    humanNick: 'You',
+    humanAvatar: 'numeric',
+    botNick: 'CPU',
+    botAvatar: 'numeric',
+  });
 }
 
 describe('local bot game', () => {

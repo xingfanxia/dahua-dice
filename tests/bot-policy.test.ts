@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { decideBotAction, probBidHolds } from '@/lib/bot/policy';
-import { isValidBid } from '@/lib/game-engine/validate';
 import { DEFAULT_RULES, type RoomState } from '@/lib/game-engine/types';
+import { isValidBid } from '@/lib/game-engine/validate';
 
 function state(overrides: Partial<RoomState> = {}): RoomState {
   return {
@@ -58,6 +58,21 @@ describe('decideBotAction', () => {
     expect(action.kind).toBe('bid');
     if (action.kind !== 'bid') return;
     expect(isValidBid(null, action.bid, s.rules, 2, { totalDice: 10 }).ok).toBe(true);
+  });
+
+  it('can RAISE against a 斋 standing bid (break-zhai), not only challenge', () => {
+    // Standing 3×6 斋 with a monster hand (three native 6s) → the bot believes it
+    // holds, so it must raise. legalBids must offer break-zhai / in-zhai options
+    // (regression: it used to emit only 飞 bids in a too-narrow window → empty set
+    // against any 斋 bid → the bot was forced to always 开).
+    const s = state({
+      lastBid: { count: 3, face: 6, isZhai: true },
+      bidChain: [{ playerId: 'me', bid: { count: 3, face: 6, isZhai: true } }],
+    });
+    const action = decideBotAction(s, [6, 6, 6, 2, 3], 'medium', () => 0.99);
+    expect(action.kind).toBe('bid');
+    if (action.kind !== 'bid') return;
+    expect(isValidBid(s.lastBid, action.bid, s.rules, 2, { totalDice: 10 }).ok).toBe(true);
   });
 
   it('probBidHolds is 1 when the bot already holds enough', () => {

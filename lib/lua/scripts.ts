@@ -340,6 +340,9 @@ if state.phase ~= 'game_end' then return cjson.encode({ok=false, reason='wrong_p
 for i = 1, #state.players do
   state.players[i].diceLeft = state.rules.diceCount
   state.players[i].alive = true
+  -- Reset the #2 endMode loss accumulator, else a knockout/score rematch carries
+  -- game-1 losses into game 2 (instant elimination / permanent handicap).
+  state.players[i].lossCount = 0
 end
 state.phase = 'lobby'
 state.round = 0

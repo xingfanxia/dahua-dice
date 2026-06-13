@@ -67,21 +67,31 @@ export function probBidHolds(state: RoomState, hand: number[], bid: Bid): number
   return binomAtLeast(bid.count - own, hidden, pMatch);
 }
 
-/** Enumerate legal next bids in a small window around the standing bid / opener. */
+/** Enumerate legal next bids around the standing bid / opener (both 飞 and 斋 so
+ * the bot can break a 斋 round, which needs count ≥ prev×2, or stay/转斋). isValidBid
+ * filters every candidate, so the emitted set is always legal. */
 function legalBids(state: RoomState, alive: number, totalDice: number): Bid[] {
   const out: Bid[] = [];
   const prev = state.lastBid;
   const baseCount = prev
     ? prev.count
     : getStartingBidThreshold(alive, false, state.rules, totalDice);
-  // Bot keeps it simple: 飞 only (isZhai false → never trips 叫1必斋), faces 2..diceSides.
-  for (let count = baseCount; count <= baseCount + 2 && count <= totalDice; count++) {
+  // Bot never bids BELOW the standing count; the high end reaches 破斋 (count ≥
+  // prev×2) only when the standing bid is 斋. Clamped to the table dice.
+  const lo = baseCount;
+  const hi = Math.min(totalDice, prev?.isZhai ? prev.count * 2 + 1 : baseCount + 2);
+  for (let count = lo; count <= hi; count++) {
+    // faces 2..diceSides (bot skips face 1 to avoid the 叫1必斋 special case).
     for (let face = 2 as number; face <= state.rules.diceSides; face++) {
-      const bid: Bid = { count, face: face as Face, isZhai: false };
-      if (
-        isValidBid(prev, bid, state.rules, alive, { totalDice, palifico: state.palificoActive }).ok
-      )
-        out.push(bid);
+      for (const isZhai of [false, true]) {
+        if (isZhai && !state.rules.allowZhai) continue;
+        const bid: Bid = { count, face: face as Face, isZhai };
+        if (
+          isValidBid(prev, bid, state.rules, alive, { totalDice, palifico: state.palificoActive })
+            .ok
+        )
+          out.push(bid);
+      }
     }
   }
   return out;
@@ -108,8 +118,13 @@ export function decideBotAction(
     // No legal raise left (e.g. count already at the table cap) — must call.
     return { kind: 'challenge' };
   }
+  // Prefer 飞 (flying) raises — the bot's natural register, where 1s help it. It
+  // only falls back to 斋 when NO flying raise is legal (e.g. breaking a 斋 round
+  // would need count ≥ prev×2 > the table dice).
+  const flying = candidates.filter((c) => !c.isZhai);
+  const pool = flying.length > 0 ? flying : candidates;
   // Most defensible raise = the one the bot itself is most confident holds.
-  const scored = candidates
+  const scored = pool
     .map((bid) => ({ bid, p: probBidHolds(state, hand, bid) }))
     .sort((a, b) => b.p - a.p);
   const safest = scored[0];

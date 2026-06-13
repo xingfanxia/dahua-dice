@@ -105,11 +105,18 @@ function applyLoss(state: RoomState, players: Player[], idx: number, diceLost: n
   });
 }
 
-/** Seat with the fewest recorded losses (lowest-seat tiebreak) — the score-mode winner. */
+/**
+ * Seat with the fewest recorded losses (lowest-seat tiebreak) — the score-mode
+ * winner. Only players still in the game count: a player who left mid-game keeps a
+ * frozen (often 0) lossCount and must not be crowned. Falls back to all seats if
+ * somehow nobody is alive.
+ */
 function lowestLossIdx(players: Player[]): number {
+  const anyAlive = players.some((p) => p.alive);
   let best = -1;
   let min = Number.POSITIVE_INFINITY;
   players.forEach((p, i) => {
+    if (anyAlive && !p.alive) return;
     const l = p.lossCount ?? 0;
     if (l < min) {
       min = l;
