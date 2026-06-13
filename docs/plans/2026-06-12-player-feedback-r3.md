@@ -16,9 +16,9 @@
 | Milestone | Issues | Scope | Status |
 |---|---|---|---|
 | **FB-1** | #3 | Round-2 perpetual-tumble freeze — Dice2D early-return now snaps to rest + regression test | ✅ DONE (710e048) |
-| **FB-2** | #1 | Zhai discount → `prev−1`; rename reason; update validate tests + spec §10B + i18n error string | ⏳ TODO |
-| **FB-3** | #2 | `endMode` enum engine: party/knockout/score + keep attrition default; Player.lossCount; finalize() per-mode; round.ts + types + Zod schema + unit tests | ⏳ TODO |
-| **FB-4** | #9 | CSS 3D cube dice (Dice2D + dice2d.css); shared `PipDie` SVG; delete 3× DICE_GLYPHS emoji | ⏳ TODO |
+| **FB-2** | #1 | Zhai discount → `prev−1`; reason zhai_count_too_low; validate tests + spec §10B + i18n (both locales) | ✅ DONE (02c9b49) |
+| **FB-3** | #2 | `endMode` enum engine (party/knockout/score + attrition default); Player.lossCount; finalize() per-mode; Zod .default() back-compat; normalizeState backfill; 91 unit | ✅ DONE (02ece36) |
+| **FB-4** | #9 | CSS 3D cube dice (Dice2D + dice2d.css, transition-driven spin+land); shared `PipDie` SVG; deleted 3× DICE_GLYPHS emoji; verified light+dark | ✅ DONE (6b80630) |
 | **FB-5** | #6 | `lib/bot/policy.ts` (pure, TDD) + local game loop + `app/bot/BotClient.tsx` (/bot) + home entry | ⏳ TODO |
 | **FB-6** | #4 #5 #7 #8 #10 #11 | UX pass: turn-instruction banner (#4); current-call hero (#11); persistent BidPanel, no unmount-collapse (#10); elevated game-end controls (#5); prominent solo entry (#7); room roll ritual — client-side reveal gate on shake/tap (#8) | ⏳ TODO |
 | **FB-7** | #2 #1 | CustomizationDrawer: endMode selector + N/K inputs + prominent 斋 toggle; messages/*.json parity | ⏳ TODO |

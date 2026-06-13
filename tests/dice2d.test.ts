@@ -19,7 +19,9 @@ describe('Dice2D round-advance', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     // Deterministic: animations on (reduced-motion OFF) so the tumble path runs.
-    window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as unknown as typeof window.matchMedia;
+    window.matchMedia = vi
+      .fn()
+      .mockReturnValue({ matches: false }) as unknown as typeof window.matchMedia;
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
