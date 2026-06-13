@@ -350,8 +350,8 @@ describe('prepareNextRound + Palifico', () => {
   });
 });
 
-describe('loseDie house rule (聚会版: 输了不减骰、不淘汰)', () => {
-  it('challenge with loseDie=false → loser keeps all dice, game never ends', () => {
+describe('endMode house rules (#2)', () => {
+  it('party: loser keeps all dice, never eliminated, game never ends, but loss is recorded', () => {
     const s = makeState({
       players: [
         { id: 'p1', nick: 'A', avatar: 'numeric', diceLeft: 1, alive: true },
@@ -360,21 +360,78 @@ describe('loseDie house rule (聚会版: 输了不减骰、不淘汰)', () => {
       currentTurnIdx: 1,
       lastBid: { count: 6, face: 4, isZhai: false },
       bidChain: [{ playerId: 'p1', bid: { count: 6, face: 4, isZhai: false } }],
-      rules: { ...DEFAULT_RULES, loseDie: false },
+      rules: { ...DEFAULT_RULES, endMode: 'party' },
     });
     const r = resolveChallenge(s, { p1: [3], p2: [3] }, 'p2'); // actual 0 < 6 → p1 loses
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.outcome.loserId).toBe('p1');
     expect(r.state.players[0].diceLeft).toBe(1); // 不减骰
-    expect(r.state.players[0].alive).toBe(true);
-    expect(r.outcome.gameEnded).toBe(false); // 即使剩 1 颗也不淘汰、不终局
+    expect(r.state.players[0].alive).toBe(true); // 永不淘汰
+    expect(r.state.players[0].lossCount).toBe(1); // 但记一次失败
+    expect(r.outcome.gameEnded).toBe(false);
+    expect(r.outcome.winnerIdx).toBe(-1);
   });
 
-  it('default (loseDie omitted) still removes a die (淘汰制向后兼容)', () => {
+  it('attrition default (endMode omitted) still removes a die (淘汰制向后兼容)', () => {
     const r = resolveChallenge(makeState(), HANDS, 'p3');
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.state.players[1].diceLeft).toBe(4); // 减一颗
+    expect(r.state.players[1].lossCount).toBe(1);
   });
-})
+
+  it('knockout: dice never shrink, player eliminated only on reaching N losses', () => {
+    const s = makeState({
+      players: [
+        { id: 'p1', nick: 'A', avatar: 'numeric', diceLeft: 5, alive: true, lossCount: 1 },
+        { id: 'p2', nick: 'B', avatar: 'numeric', diceLeft: 5, alive: true },
+      ],
+      currentTurnIdx: 1,
+      lastBid: { count: 6, face: 4, isZhai: false },
+      bidChain: [{ playerId: 'p1', bid: { count: 6, face: 4, isZhai: false } }],
+      rules: { ...DEFAULT_RULES, endMode: 'knockout', knockoutLosses: 2 },
+    });
+    const r = resolveChallenge(s, { p1: [3], p2: [3] }, 'p2'); // p1 loses: lossCount 1→2 = N
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.players[0].diceLeft).toBe(5); // 不减骰
+    expect(r.state.players[0].lossCount).toBe(2);
+    expect(r.state.players[0].alive).toBe(false); // 累计 2 次 → 淘汰
+    expect(r.outcome.gameEnded).toBe(true); // 仅剩 p2
+    expect(r.outcome.winnerIdx).toBe(1);
+  });
+
+  it('score: ends after K rounds, fewest-losses player wins (lowest-seat tiebreak)', () => {
+    const s = makeState({
+      players: [
+        { id: 'p1', nick: 'A', avatar: 'numeric', diceLeft: 5, alive: true, lossCount: 2 },
+        { id: 'p2', nick: 'B', avatar: 'numeric', diceLeft: 5, alive: true, lossCount: 0 },
+        { id: 'p3', nick: 'C', avatar: 'numeric', diceLeft: 5, alive: true, lossCount: 1 },
+      ],
+      currentTurnIdx: 2,
+      round: 3,
+      rules: { ...DEFAULT_RULES, endMode: 'score', scoreRounds: 3 },
+    });
+    // bid 6个4 not met (actual 5) → standing bidder p2 loses: lossCount 0→1
+    const r = resolveChallenge(s, HANDS, 'p3');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.players.every((p) => p.diceLeft === 5)).toBe(true); // 不减骰
+    expect(r.outcome.gameEnded).toBe(true); // round 3 >= K=3
+    // after: p1=2, p2=1, p3=1 → fewest=1, tie p2/p3, lowest seat = p2 (idx 1)
+    expect(r.outcome.winnerIdx).toBe(1);
+  });
+
+  it('score: not ended before K rounds', () => {
+    const s = makeState({
+      round: 2,
+      rules: { ...DEFAULT_RULES, endMode: 'score', scoreRounds: 5 },
+    });
+    const r = resolveChallenge(s, HANDS, 'p3');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.outcome.gameEnded).toBe(false);
+    expect(r.outcome.winnerIdx).toBe(-1);
+  });
+});

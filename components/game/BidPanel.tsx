@@ -364,7 +364,9 @@ export function BidPanel({
               case 'break_zhai_needs_2x':
                 return t('errors.breakZhaiNeeds2x');
               case 'zhai_count_too_low':
-                return t('errors.zhaiCountTooLow', { min: Math.max(1, (state.lastBid?.count ?? 1) - 1) });
+                return t('errors.zhaiCountTooLow', {
+                  min: Math.max(1, (state.lastBid?.count ?? 1) - 1),
+                });
               case 'face_one_must_zhai':
                 return t('errors.faceOneMustZhai');
               case 'palifico_count_locked':

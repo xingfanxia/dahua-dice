@@ -55,6 +55,11 @@ export const gameRulesSchema = z.object({
     tongsha: z.boolean(),
   }),
   paliFicoVariant: z.boolean(),
+  // #2 game-end house rule. `.default()` keeps older clients/rooms that omit these
+  // valid and 淘汰制 (matches the engine's `?? 'attrition'` back-compat).
+  endMode: z.enum(['attrition', 'party', 'knockout', 'score']).default('attrition'),
+  knockoutLosses: z.number().int().min(1).max(20).default(3),
+  scoreRounds: z.number().int().min(1).max(50).default(5),
 });
 
 /**

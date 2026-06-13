@@ -9,6 +9,16 @@ export type Bid = {
   isZhai: boolean;
 };
 
+/**
+ * Game-end / scoring house rule (#2). Decides whether a loss removes a die and
+ * how the game ends:
+ *  - attrition  减骰子·末位淘汰·剩 1 人获胜（默认，向后兼容旧房间）
+ *  - party      不减骰子·永不淘汰·无人获胜，每轮只决出输家（喝一杯），玩到手动结束
+ *  - knockout   不减骰子·累计输 knockoutLosses 次淘汰·剩 1 人获胜
+ *  - score      不减骰子·打满 scoreRounds 轮·输得最少者获胜
+ */
+export type EndMode = 'attrition' | 'party' | 'knockout' | 'score';
+
 export type GameRules = {
   diceCount: 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
   aceWild: boolean; // 1 点是否万能 (only when not in zhai round)
@@ -17,9 +27,10 @@ export type GameRules = {
   diceSides: 6 | 8;
   chineseExtensions: { pi: boolean; fanpi: boolean; tongsha: boolean };
   paliFicoVariant: boolean;
-  // 失败减骰子（淘汰制）。false = 聚会版：输了不减骰、永不淘汰，每轮只决出输家（喝一杯）。
-  // 旧文档无此字段 → 解算时按 `=== false` 判定，缺省即淘汰制（向后兼容）。
-  loseDie: boolean;
+  // 旧房间无 endMode 字段 → 引擎按 `?? 'attrition'` 解算，normalizeState 也会回填。
+  endMode: EndMode;
+  knockoutLosses: number; // N: knockout 模式累计输几次淘汰
+  scoreRounds: number; // K: score 模式打满几轮
 };
 
 export const DEFAULT_RULES: GameRules = {
@@ -30,7 +41,9 @@ export const DEFAULT_RULES: GameRules = {
   diceSides: 6,
   chineseExtensions: { pi: false, fanpi: false, tongsha: false },
   paliFicoVariant: false,
-  loseDie: true,
+  endMode: 'attrition',
+  knockoutLosses: 3,
+  scoreRounds: 5,
 };
 
 export type Player = {
@@ -39,6 +52,8 @@ export type Player = {
   avatar: string; // texture set key
   diceLeft: number;
   alive: boolean;
+  // 累计输的轮数（knockout 淘汰判定 + score 排名用）。旧房间省略，视为 0。
+  lossCount?: number;
 };
 
 export type ChallengeOutcome = {

@@ -12,7 +12,7 @@
  * 反劈/通杀 = challenge-mode variants), §3.4 (Palifico).
  */
 
-import type { Bid, ChallengeOutcome, Player, RoomState } from './types';
+import type { Bid, ChallengeOutcome, EndMode, Player, RoomState } from './types';
 
 /** playerId → that player's dice (only alive players are dealt hands). */
 export type Hands = Record<string, number[]>;
@@ -74,19 +74,49 @@ function prevAliveIdx(players: Player[], from: number): number {
   return from;
 }
 
-/** Dice actually removed for a loss. 0 in the no-elimination house rule (聚会版:
- * 输了不减骰、永不淘汰，只决出本轮输家). `=== false` so old rooms w/o the field stay 淘汰制. */
-function lossFor(state: RoomState, n: number): number {
-  return state.rules.loseDie === false ? 0 : n;
+/** Active end-mode (#2). Old rooms w/o the field default to 淘汰制 for back-compat. */
+function endModeOf(state: RoomState): EndMode {
+  return state.rules.endMode ?? 'attrition';
 }
 
-/** Subtract `n` dice from the player at `idx`; mark them out at 0. Immutable. */
-function applyLoss(players: Player[], idx: number, n: number): Player[] {
+/**
+ * Record a round-loss for the player at `idx` and apply its consequence per the
+ * endMode house rule. ALWAYS bumps lossCount by 1 (one round lost). Dice are only
+ * removed in 'attrition' (and the player is out at 0 dice); in 'knockout' the
+ * player is eliminated once lossCount reaches rules.knockoutLosses; 'party'/'score'
+ * never remove dice or eliminate. `diceLost` is the attrition severity (1, or 2 for
+ * a failed 劈/通杀). Immutable.
+ */
+function applyLoss(state: RoomState, players: Player[], idx: number, diceLost: number): Player[] {
+  const mode = endModeOf(state);
   return players.map((p, i) => {
     if (i !== idx) return p;
-    const left = Math.max(0, p.diceLeft - n);
-    return { ...p, diceLeft: left, alive: left > 0 };
+    const lossCount = (p.lossCount ?? 0) + 1;
+    if (mode === 'attrition') {
+      const left = Math.max(0, p.diceLeft - diceLost);
+      return { ...p, diceLeft: left, lossCount, alive: left > 0 };
+    }
+    if (mode === 'knockout') {
+      const knocked = lossCount >= (state.rules.knockoutLosses ?? 3);
+      return { ...p, lossCount, alive: !knocked };
+    }
+    // party / score: dice and alive unchanged — only the loss is recorded.
+    return { ...p, lossCount };
   });
+}
+
+/** Seat with the fewest recorded losses (lowest-seat tiebreak) — the score-mode winner. */
+function lowestLossIdx(players: Player[]): number {
+  let best = -1;
+  let min = Number.POSITIVE_INFINITY;
+  players.forEach((p, i) => {
+    const l = p.lossCount ?? 0;
+    if (l < min) {
+      min = l;
+      best = i;
+    }
+  });
+  return best;
 }
 
 /** The owner of the current standing bid = the last entry in the round's bid chain. */
@@ -100,13 +130,27 @@ function finalize(
   players: Player[],
   partial: Omit<ChallengeOutcome, 'gameEnded' | 'winnerIdx' | 'loserId'>,
 ): { ok: true; state: RoomState; outcome: ChallengeOutcome } {
-  const alive = aliveCount(players);
-  const gameEnded = alive <= 1;
+  const mode = endModeOf(state);
+  let gameEnded: boolean;
+  let winnerIdx: number;
+  if (mode === 'party') {
+    // 聚会版: never ends on its own — runs until players leave (leaveRoom Lua ends it).
+    gameEnded = false;
+    winnerIdx = -1;
+  } else if (mode === 'score') {
+    // 计分制: ends after K rounds; fewest-losses player wins.
+    gameEnded = state.round >= (state.rules.scoreRounds ?? 5);
+    winnerIdx = gameEnded ? lowestLossIdx(players) : -1;
+  } else {
+    // attrition + knockout: last player standing wins.
+    gameEnded = aliveCount(players) <= 1;
+    winnerIdx = gameEnded ? lastAliveIdx(players) : -1;
+  }
   const outcome: ChallengeOutcome = {
     ...partial,
     loserId: players[partial.loserIdx]?.id ?? '',
     gameEnded,
-    winnerIdx: gameEnded ? lastAliveIdx(players) : -1,
+    winnerIdx,
   };
   return {
     ok: true,
@@ -147,7 +191,7 @@ export function resolveChallenge(
   const bidderIdx =
     bidderId != null ? idxOf(state, bidderId) : prevAliveIdx(state.players, challengerIdx);
   const loserIdx = meets ? challengerIdx : bidderIdx;
-  const players = applyLoss(state.players, loserIdx, lossFor(state, 1));
+  const players = applyLoss(state, state.players, loserIdx, 1);
 
   return finalize(state, players, {
     kind: 'challenge',
@@ -200,7 +244,7 @@ export function resolvePi(
 
   const loserIdx = meets ? splitterIdx : targetIdx;
   const diceLost = meets && state.rules.chineseExtensions.fanpi ? 2 : 1;
-  const players = applyLoss(state.players, loserIdx, lossFor(state, diceLost));
+  const players = applyLoss(state, state.players, loserIdx, diceLost);
 
   return finalize(state, players, {
     kind: 'pi',
@@ -243,13 +287,13 @@ export function resolveTongsha(state: RoomState, hands: Hands, tongshaId: string
   let diceLost: number;
   if (!meets) {
     // Sweep: every other chain bidder loses a die.
-    for (const id of chainBidderIds) players = applyLoss(players, idxOf(state, id), lossFor(state, 1));
+    for (const id of chainBidderIds) players = applyLoss(state, players, idxOf(state, id), 1);
     loserIds = chainBidderIds;
     loserIdx = idxOf(state, chainBidderIds[0]);
     diceLost = 1;
   } else {
     // Backfire: the 通杀er loses 2 dice.
-    players = applyLoss(players, tIdx, lossFor(state, 2));
+    players = applyLoss(state, players, tIdx, 2);
     loserIds = [tongshaId];
     loserIdx = tIdx;
     diceLost = 2;
