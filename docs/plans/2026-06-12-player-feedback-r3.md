@@ -19,10 +19,12 @@
 | **FB-2** | #1 | Zhai discount → `prev−1`; reason zhai_count_too_low; validate tests + spec §10B + i18n (both locales) | ✅ DONE (02c9b49) |
 | **FB-3** | #2 | `endMode` enum engine (party/knockout/score + attrition default); Player.lossCount; finalize() per-mode; Zod .default() back-compat; normalizeState backfill; 91 unit | ✅ DONE (02ece36) |
 | **FB-4** | #9 | CSS 3D cube dice (Dice2D + dice2d.css, transition-driven spin+land); shared `PipDie` SVG; deleted 3× DICE_GLYPHS emoji; verified light+dark | ✅ DONE (6b80630) |
-| **FB-5** | #6 | `lib/bot/policy.ts` (pure, TDD) + local game loop + `app/bot/BotClient.tsx` (/bot) + home entry | ⏳ TODO |
-| **FB-6** | #4 #5 #7 #8 #10 #11 | UX pass: turn-instruction banner (#4); current-call hero (#11); persistent BidPanel, no unmount-collapse (#10); elevated game-end controls (#5); prominent solo entry (#7); room roll ritual — client-side reveal gate on shake/tap (#8) | ⏳ TODO |
-| **FB-7** | #2 #1 | CustomizationDrawer: endMode selector + N/K inputs + prominent 斋 toggle; messages/*.json parity | ⏳ TODO |
-| **FB-8** | all | e2e (round-2 [data-tumbling] assertion, endMode flows, bot smoke); multipass review; neat-freak docs sync; PR | ⏳ TODO |
+| **FB-5** | #6 #7 | LOCAL /bot mode: pure policy (binomial + 3 difficulties, 9 tests) + local-game loop reusing the engine + BotClient reusing room components; verified end-to-end. ALSO promoted home offline entries (#7). | ✅ DONE (91215f2) |
+| **FB-6** | #4 #5 #8 #10 #11 | Room UX: turn banner (#4); current-call hero (#11); waiting card no-collapse (#10); clearer game-end controls (#5); cup 开盅 ritual on shake/tap (#8). e2e openCup helper + .dice2d-cube. Verified live. | ✅ DONE (a489b12) |
+| **FB-7** | #2 #1 | CustomizationDrawer endMode selector + N/K steppers (wired to save); prominent amber 斋 toggle (was a 16px checkbox); zh+en parity. Verified live drawer. | ✅ DONE (32628c6) |
+| **FB-8** | all | bot e2e smoke (34 e2e); 4-dim multipass review → 5 findings fixed+tested (97cf012); neat-freak docs sync (CLAUDE.md/README/memory); PR | ✅ DONE |
+
+**Outcome**: all 11 issues shipped. 102 unit + 34 e2e green; typecheck/lint/build clean. Verified live (light+dark): 3D cube dice, /bot game, room cup ritual + banner + hero, endMode drawer. ⚠ wxapp `lib/game-engine/` sync broken by FB-2/FB-3 — flagged in the wxapp-port memory for back-port.
 
 ## Non-obvious notes (carry-forward)
 
