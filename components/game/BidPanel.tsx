@@ -4,9 +4,8 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Bid, Face, GameRules, Player, RoomState } from '@/lib/game-engine/types';
 import { getStartingBidThreshold, isValidBid } from '@/lib/game-engine/validate';
+import { PipDie } from '../dice/PipDie';
 import { AvatarBadge } from './AvatarBadge';
-
-const DICE_GLYPHS = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅', '7', '8'];
 
 export function BidPanel({
   state,
@@ -160,7 +159,7 @@ export function BidPanel({
         <p className="text-sm text-gray-500 dark:text-gray-400">
           {t('game.callDescription', {
             count: state.lastBid.count,
-            face: DICE_GLYPHS[state.lastBid.face - 1],
+            face: String(state.lastBid.face),
           })}
           {state.lastBid.isZhai && (
             <span className="ml-1 text-amber-800 dark:text-amber-300">· {t('game.zhai')}</span>
@@ -211,15 +210,15 @@ export function BidPanel({
                 type="button"
                 disabled={disabled}
                 onClick={() => setFace(f)}
-                className={`aspect-square min-h-[44px] rounded-xl text-2xl disabled:opacity-30 ${
+                className={`flex aspect-square min-h-[44px] items-center justify-center rounded-xl disabled:opacity-30 ${
                   active
-                    ? 'bg-red-600 font-semibold text-white'
-                    : 'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-gray-100'
+                    ? 'bg-red-600 ring-2 ring-red-600 ring-offset-1 dark:ring-offset-gray-800'
+                    : 'bg-gray-100 dark:bg-gray-700'
                 }`}
                 aria-pressed={active}
                 aria-label={`${f}`}
               >
-                {DICE_GLYPHS[f - 1]}
+                <PipDie face={f} size={30} />
               </button>
             );
           })}
@@ -249,7 +248,7 @@ export function BidPanel({
           onClick={() => onBid(candidate)}
           className="flex-1 rounded-2xl bg-emerald-700 py-4 font-medium text-white transition-opacity disabled:opacity-40"
         >
-          {t('game.submitBid', { count, face: DICE_GLYPHS[face - 1] })}
+          {t('game.submitBid', { count, face: String(face) })}
         </button>
         {state.lastBid && (
           <button
