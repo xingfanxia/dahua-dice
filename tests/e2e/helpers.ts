@@ -55,13 +55,15 @@ export async function startGame(ownerPage: Page) {
 }
 
 /**
- * Open the dice cup (#8 roll ritual) so the dice render. Each round the dice
- * start covered; tapping 开盅 reveals them. `click` auto-waits for the cup to
- * appear (the game view just transitioned); tolerates the cup being absent.
+ * Open the dice cup (#8 roll ritual) so the dice render. Each round the player's
+ * own hand starts covered (MyHand): a tappable card labelled "N 颗骰子，暗置".
+ * Tapping it throws + reveals the hand. `click` auto-waits for the covered card to
+ * appear (the hand is fetched async); tolerates it being absent / already revealed.
  */
 export async function openCup(page: Page) {
   await page
-    .getByRole('button', { name: /开盅/ })
+    .getByRole('button', { name: /暗置/ })
+    .first()
     .click({ timeout: 15000 })
     .catch(() => {});
 }

@@ -28,14 +28,21 @@ test.describe('accessibility (axe)', () => {
     expect(results.violations).toEqual([]);
   });
 
-  test('solo dice-cup has no WCAG A/AA violations (idle + rolled)', async ({ page }) => {
+  test('solo dice-cup has no WCAG A/AA violations (idle + covered + revealed)', async ({
+    page,
+  }) => {
     await page.goto('/solo');
     await page.waitForLoadState('networkidle');
     expect((await scan(page)).violations).toEqual([]);
-    // Re-scan after a roll: the dice + cover/peek + reroll controls only render once
-    // a hand exists, so the idle scan doesn't cover them.
+    // Roll → the hand renders COVERED (MyHand). Scan that state (dice tray + reveal
+    // prompt only exist once a hand is dealt).
     await page.getByRole('button', { name: /^摇骰子$|^Roll$/ }).click();
-    await expect(page.getByText(/你的骰子:|Your dice:/)).toBeVisible({ timeout: 10_000 });
+    const handCard = page.locator('button:has(.dice2d-tray)');
+    await expect(handCard).toBeVisible({ timeout: 10_000 });
+    expect((await scan(page)).violations).toEqual([]);
+    // Tap to reveal, then scan the revealed state (summary chips + cover prompt).
+    await handCard.click();
+    await expect(handCard).toHaveAttribute('aria-label', /你的骰子|Your dice/i);
     expect((await scan(page)).violations).toEqual([]);
   });
 
