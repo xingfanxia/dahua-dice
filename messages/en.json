@@ -208,6 +208,7 @@
     "title": "vs Computer",
     "subtitle": "Play a round against the computer · all on-device, offline",
     "difficulty": "Difficulty",
+    "diceCount": "Dice",
     "easy": "Easy",
     "medium": "Medium",
     "hard": "Hard",
