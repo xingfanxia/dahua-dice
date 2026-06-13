@@ -448,7 +448,7 @@ function applyChineseExtension(action: ChineseExtAction, state: GameState): Game
 - 起叫数 = `ceil(rules.startingBidFactor × alivePlayers)`，斋叫为 `alivePlayers`；**两者都 clamp 到场上骰子总数**（2026-06-09 修订：不 clamp 时残局 1v1 各 1 颗骰 → 起叫门槛 3 > 总骰 2，开局者无任何合法动作，死锁）
 - 加叫合法性：`count > prev.count` OR (`count === prev.count && face > prev.face`)
 - 斋后破斋（飞）：`next.count >= prev.count × 2`
-- 进入斋（中途转斋）：只需满足普通加叫规则（research §2.3），NO halve-pool 限制
+- 进入斋（中途转斋）：1 不再当万能，点数池缩小，数量**最多少叫一个** `next.count >= prev.count − 1`，点数自选（AX 实牌规则 2026-06-12，用户确认；低于此 reason=`zhai_count_too_low`）。早期实现曾放宽到 `ceil(prev/2)`，2026-06-12 收紧为 prev−1。
 - 叫1必斋：`face === 1` 必须为斋叫（research §2.3）
 - 1 点万能：非斋叫且非 Palifico 时算 `face` + `1` 点，斋叫/Palifico 时只算 `face`
 - 防作弊：叫数不得超过场上骰子总数

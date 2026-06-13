@@ -129,6 +129,7 @@
     "invalidFace": "Invalid face",
     "faceOneMustZhai": "Bidding 1 must be a zhai call",
     "breakZhaiNeeds2x": "Breaking zhai needs ≥ 2×",
+    "zhaiCountTooLow": "Entering zhai drops at most one — need ≥ {min}",
     "belowStarting": "First bid needs ≥ {min}",
     "invalidCount": "Count must be a positive integer",
     "notYourTurn": "Not your turn",
