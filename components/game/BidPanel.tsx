@@ -2,7 +2,6 @@
 
 import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTheme } from '@/components/theme/ThemeProvider';
 import type { Bid, Face, GameRules, Player, RoomState } from '@/lib/game-engine/types';
 import { getStartingBidThreshold, isValidBid } from '@/lib/game-engine/validate';
 import { AvatarBadge } from './AvatarBadge';
@@ -27,7 +26,6 @@ export function BidPanel({
   busy: boolean;
 }) {
   const t = useTranslations();
-  const { tokens } = useTheme();
   const rules: GameRules = state.rules;
   const palifico = state.palificoActive ?? false;
   const chain = Array.isArray(state.bidChain) ? state.bidChain : [];
@@ -151,38 +149,27 @@ export function BidPanel({
   }, []);
 
   return (
-    <section
-      className="rounded-3xl p-4 flex flex-col gap-4"
-      style={{ backgroundColor: tokens.colors.surface }}
-    >
+    <section className="flex flex-col gap-4 rounded-2xl bg-white p-4 dark:bg-gray-800">
       {palifico && (
-        <p
-          className="text-xs text-center px-3 py-2 rounded-xl"
-          style={{ backgroundColor: `${tokens.colors.accent}22`, color: tokens.colors.accent }}
-        >
+        <p className="rounded-xl bg-amber-100 px-3 py-2 text-center text-xs text-amber-800 dark:bg-amber-900 dark:text-amber-200">
           {t('game.palificoBanner')}
         </p>
       )}
 
       {state.lastBid && (
-        <p className="text-sm" style={{ color: tokens.colors.textMuted }}>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           {t('game.callDescription', {
             count: state.lastBid.count,
             face: DICE_GLYPHS[state.lastBid.face - 1],
           })}
           {state.lastBid.isZhai && (
-            <span className="ml-1" style={{ color: tokens.colors.accent }}>
-              · {t('game.zhai')}
-            </span>
+            <span className="ml-1 text-amber-800 dark:text-amber-300">· {t('game.zhai')}</span>
           )}
         </p>
       )}
 
       <div className="flex items-center justify-between gap-4">
-        <span
-          className="text-xs uppercase tracking-wide"
-          style={{ color: tokens.colors.textMuted }}
-        >
+        <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
           {t('game.count')}
         </span>
         <div className="flex items-center gap-3">
@@ -190,24 +177,19 @@ export function BidPanel({
             type="button"
             disabled={countLocked}
             onClick={() => setCount((c) => Math.max(1, c - 1))}
-            className="w-11 h-11 rounded-full text-xl font-medium disabled:opacity-30"
-            style={{ backgroundColor: tokens.colors.bg, color: tokens.colors.text }}
+            className="h-11 w-11 rounded-full bg-gray-100 text-xl font-medium text-gray-900 disabled:opacity-30 dark:bg-gray-700 dark:text-gray-100"
             aria-label={t('game.countDown')}
           >
             −
           </button>
-          <span
-            className="text-3xl num min-w-[2ch] text-center"
-            style={{ color: tokens.colors.text }}
-          >
+          <span className="num min-w-[2ch] text-center text-3xl font-bold text-gray-900 dark:text-gray-100">
             {count}
           </span>
           <button
             type="button"
             disabled={countLocked}
             onClick={() => setCount((c) => c + 1)}
-            className="w-11 h-11 rounded-full text-xl font-medium disabled:opacity-30"
-            style={{ backgroundColor: tokens.colors.bg, color: tokens.colors.text }}
+            className="h-11 w-11 rounded-full bg-gray-100 text-xl font-medium text-gray-900 disabled:opacity-30 dark:bg-gray-700 dark:text-gray-100"
             aria-label={t('game.countUp')}
           >
             +
@@ -216,28 +198,25 @@ export function BidPanel({
       </div>
 
       <div className="flex flex-col gap-2">
-        <span
-          className="text-xs uppercase tracking-wide"
-          style={{ color: tokens.colors.textMuted }}
-        >
+        <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
           {t('game.face')}
         </span>
         <div className="grid grid-cols-6 gap-2">
           {Array.from({ length: rules.diceSides }, (_, i) => (i + 1) as Face).map((f) => {
             const disabled = f === 1 && !rules.allowZhai && !palifico;
+            const active = face === f;
             return (
               <button
                 key={f}
                 type="button"
                 disabled={disabled}
                 onClick={() => setFace(f)}
-                className="aspect-square min-h-[44px] rounded-xl text-2xl disabled:opacity-30"
-                style={{
-                  backgroundColor: face === f ? tokens.colors.primary : tokens.colors.bg,
-                  color: face === f ? tokens.colors.bg : tokens.colors.text,
-                  fontWeight: face === f ? 600 : 400,
-                }}
-                aria-pressed={face === f}
+                className={`aspect-square min-h-[44px] rounded-xl text-2xl disabled:opacity-30 ${
+                  active
+                    ? 'bg-red-600 font-semibold text-white'
+                    : 'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-gray-100'
+                }`}
+                aria-pressed={active}
                 aria-label={`${f}`}
               >
                 {DICE_GLYPHS[f - 1]}
@@ -248,31 +227,27 @@ export function BidPanel({
       </div>
 
       {rules.allowZhai && !palifico && (
-        <label
-          className="flex items-center gap-2 text-sm cursor-pointer"
-          style={{ color: tokens.colors.text }}
-        >
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
           <input
             type="checkbox"
             checked={isZhai}
             disabled={face === 1}
             onChange={(e) => setZhaiChecked(e.target.checked)}
-            className="w-4 h-4"
+            className="h-4 w-4 accent-amber-600"
           />
           {t('game.zhaiCall')}
           {face === 1 && (
-            <span style={{ color: tokens.colors.textMuted }}>· {t('game.faceOneAutoZhai')}</span>
+            <span className="text-gray-500 dark:text-gray-400">· {t('game.faceOneAutoZhai')}</span>
           )}
         </label>
       )}
 
-      <div className="flex gap-3 mt-2">
+      <div className="mt-2 flex gap-3">
         <button
           type="button"
           disabled={busy || !validation.ok}
           onClick={() => onBid(candidate)}
-          className="flex-1 py-4 rounded-2xl font-medium disabled:opacity-40 transition-opacity"
-          style={{ backgroundColor: tokens.colors.success, color: tokens.colors.bg }}
+          className="flex-1 rounded-2xl bg-emerald-700 py-4 font-medium text-white transition-opacity disabled:opacity-40"
         >
           {t('game.submitBid', { count, face: DICE_GLYPHS[face - 1] })}
         </button>
@@ -281,8 +256,7 @@ export function BidPanel({
             type="button"
             disabled={busy}
             onClick={() => setChallengePending(true)}
-            className="flex-1 py-4 rounded-2xl font-medium disabled:opacity-40 transition-opacity"
-            style={{ backgroundColor: tokens.colors.danger, color: tokens.colors.bg }}
+            className="flex-1 rounded-2xl bg-red-600 py-4 font-medium text-white transition-opacity disabled:opacity-40"
             aria-haspopup="true"
           >
             {t('game.challenge')}
@@ -293,19 +267,17 @@ export function BidPanel({
       {/* Challenge confirm — fat-finger / Space guard before the irreversible 开. */}
       {challengePending && state.lastBid && (
         <div
-          className="flex items-center gap-2 rounded-2xl p-3"
-          style={{ backgroundColor: `${tokens.colors.danger}1a` }}
+          className="flex items-center gap-2 rounded-2xl bg-red-100 p-3 dark:bg-red-950"
           role="alertdialog"
           aria-label={t('game.challengeConfirm')}
         >
-          <span className="text-sm flex-1" style={{ color: tokens.colors.danger }}>
+          <span className="flex-1 text-sm text-red-700 dark:text-red-300">
             {t('game.challengeConfirm')}
           </span>
           <button
             type="button"
             onClick={() => setChallengePending(false)}
-            className="px-4 min-h-[44px] rounded-xl text-sm"
-            style={{ color: tokens.colors.textMuted }}
+            className="min-h-[44px] rounded-xl px-4 text-sm text-gray-700 dark:text-gray-300"
           >
             {t('common.cancel')}
           </button>
@@ -316,8 +288,7 @@ export function BidPanel({
               setChallengePending(false);
               onChallenge();
             }}
-            className="px-4 min-h-[44px] rounded-xl text-sm font-medium disabled:opacity-40"
-            style={{ backgroundColor: tokens.colors.danger, color: tokens.colors.bg }}
+            className="min-h-[44px] rounded-xl bg-red-600 px-4 text-sm font-medium text-white disabled:opacity-40"
           >
             {t('game.challengeConfirmBtn')}
           </button>
@@ -332,12 +303,7 @@ export function BidPanel({
               type="button"
               disabled={busy}
               onClick={() => setPiOpen((o) => !o)}
-              className="flex-1 py-3 rounded-2xl text-sm font-medium disabled:opacity-40"
-              style={{
-                backgroundColor: tokens.colors.bg,
-                color: tokens.colors.accent,
-                border: `1px solid ${tokens.colors.accent}66`,
-              }}
+              className="flex-1 rounded-2xl border border-amber-500 py-3 text-sm font-medium text-amber-800 disabled:opacity-40 dark:border-amber-400 dark:text-amber-300"
               aria-expanded={piOpen}
             >
               {t('game.pi')}
@@ -348,12 +314,7 @@ export function BidPanel({
               type="button"
               disabled={busy}
               onClick={onTongsha}
-              className="flex-1 py-3 rounded-2xl text-sm font-medium disabled:opacity-40"
-              style={{
-                backgroundColor: tokens.colors.bg,
-                color: tokens.colors.danger,
-                border: `1px solid ${tokens.colors.danger}66`,
-              }}
+              className="flex-1 rounded-2xl border border-red-400 py-3 text-sm font-medium text-red-600 disabled:opacity-40 dark:text-red-400"
             >
               {t('game.tongsha')}
             </button>
@@ -363,9 +324,7 @@ export function BidPanel({
 
       {piOpen && piTargets.length > 0 && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs" style={{ color: tokens.colors.textMuted }}>
-            {t('game.piPickTarget')}
-          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{t('game.piPickTarget')}</p>
           <div className="flex flex-wrap gap-2">
             {piTargets.map((p) => (
               <button
@@ -376,8 +335,7 @@ export function BidPanel({
                   setPiOpen(false);
                   onPi(p.id);
                 }}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl disabled:opacity-40"
-                style={{ backgroundColor: tokens.colors.bg, color: tokens.colors.text }}
+                className="flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 text-gray-900 disabled:opacity-40 dark:bg-gray-700 dark:text-gray-100"
               >
                 <AvatarBadge avatar={p.avatar} seed={p.id} seat={1} size={22} />
                 {p.nick}
@@ -388,7 +346,7 @@ export function BidPanel({
       )}
 
       {!validation.ok && (
-        <p className="text-xs text-center" style={{ color: tokens.colors.danger }} role="alert">
+        <p className="text-center text-xs text-red-600 dark:text-red-400" role="alert">
           {(() => {
             switch (validation.reason) {
               case 'zhai_disabled':

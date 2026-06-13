@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import { useTheme } from '@/components/theme/ThemeProvider';
 import type { Locale } from '@/lib/i18n';
 import { setLocale } from '@/lib/locale-action';
 
@@ -21,7 +20,6 @@ const LANGS: { code: Locale; label: string }[] = [
 export function LanguageToggle({ label }: { label?: string }) {
   const router = useRouter();
   const locale = useLocale();
-  const { tokens } = useTheme();
 
   async function pick(code: Locale) {
     if (code === locale) return;
@@ -36,7 +34,7 @@ export function LanguageToggle({ label }: { label?: string }) {
   }
 
   return (
-    <fieldset className="flex flex-wrap items-center gap-2 m-0 min-w-0 border-0 p-0">
+    <fieldset className="m-0 flex min-w-0 flex-wrap items-center gap-2 border-0 p-0">
       {label ? <legend className="sr-only">{label}</legend> : null}
       {LANGS.map((l) => {
         const active = l.code === locale;
@@ -46,12 +44,11 @@ export function LanguageToggle({ label }: { label?: string }) {
             type="button"
             onClick={() => pick(l.code)}
             aria-pressed={active}
-            className="rounded-full border px-3 py-1.5 font-ui text-sm transition-colors"
-            style={{
-              borderColor: active ? `${tokens.colors.text}33` : `${tokens.colors.textMuted}33`,
-              backgroundColor: active ? `${tokens.colors.text}10` : 'transparent',
-              color: active ? tokens.colors.text : tokens.colors.textMuted,
-            }}
+            className={`min-h-[44px] rounded-full px-4 text-sm transition-colors ${
+              active
+                ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
+                : 'bg-white text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+            }`}
           >
             {l.label}
           </button>

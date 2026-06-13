@@ -13,14 +13,13 @@ import { PlayerRing } from '@/components/game/PlayerRing';
 import { RevealStage } from '@/components/game/RevealStage';
 import { useRoomEvents } from '@/components/game/useRoomEvents';
 import { useShakeDetector } from '@/components/shake/useShakeDetector';
-import { useTheme } from '@/components/theme/ThemeProvider';
 import { unlockAudio } from '@/lib/audio/howl-instance';
 import { useDiceAudio } from '@/lib/audio/useDiceAudio';
+import { summarizeHand } from '@/lib/game/hand-summary';
 import type { GameRules, RoomState } from '@/lib/game-engine/types';
 
 export function RoomClient({ initialState, code }: { initialState: RoomState; code: string }) {
   const t = useTranslations();
-  const { tokens } = useTheme();
   const router = useRouter();
   const [state, setState] = useState<RoomState>(initialState);
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -179,7 +178,6 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
   const isOwner = state.ownerId === myPlayerId;
   const canStart = isOwner && state.players.length >= 2 && state.phase === 'lobby';
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { setTheme } = useTheme();
 
   const [saveError, setSaveError] = useState<string | null>(null);
   async function handleSaveRules(rules: GameRules) {
@@ -233,19 +231,17 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
 
   if (longOffline) {
     return (
-      <main
-        className="min-h-[100dvh] safe-top safe-bottom flex flex-col items-center justify-center gap-4 px-6 text-center"
-        style={{ backgroundColor: tokens.colors.bg, color: tokens.colors.text }}
-      >
-        <p className="text-xl font-display">{t('game.disconnected')}</p>
+      <main className="safe-top safe-bottom flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-gray-50 px-6 text-center dark:bg-gray-900">
+        <p className="text-xl font-bold text-gray-900 dark:text-gray-100">
+          {t('game.disconnected')}
+        </p>
         <button
           type="button"
           // Full reload re-runs the SSR fetch AND tears down the dead EventSource /
           // client state — router.refresh() only re-fetches RSC and leaves the
           // permanently-CLOSED SSE + stale client error in place (a no-op rejoin).
           onClick={() => window.location.reload()}
-          className="px-6 min-h-[44px] rounded-2xl font-medium"
-          style={{ backgroundColor: tokens.colors.primary, color: tokens.colors.bg }}
+          className="min-h-[44px] rounded-2xl bg-red-600 px-6 font-medium text-white"
         >
           {t('game.rejoin')}
         </button>
@@ -254,30 +250,27 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
   }
 
   return (
-    <main className="min-h-[100dvh] safe-top safe-bottom flex flex-col px-4 py-6 gap-6 max-w-md mx-auto w-full">
+    <main className="safe-top safe-bottom mx-auto flex min-h-[100dvh] w-full max-w-md flex-col gap-5 px-4 py-6">
       {reconnecting && (
         <div
-          className="text-xs text-center py-1.5 rounded-lg"
+          className="rounded-lg bg-amber-100 py-1.5 text-center text-xs text-amber-800 dark:bg-amber-900 dark:text-amber-200"
           role="status"
-          style={{ backgroundColor: `${tokens.colors.danger}22`, color: tokens.colors.danger }}
         >
           {t('game.reconnecting')}
         </div>
       )}
       {saveError && (
         <div
-          className="text-xs text-center py-1.5 rounded-lg"
+          className="rounded-lg bg-red-100 py-1.5 text-center text-xs text-red-700 dark:bg-red-950 dark:text-red-300"
           role="alert"
-          style={{ backgroundColor: `${tokens.colors.danger}22`, color: tokens.colors.danger }}
         >
           {saveError}
         </div>
       )}
       {startError && (
         <div
-          className="text-xs text-center py-1.5 rounded-lg"
+          className="rounded-lg bg-red-100 py-1.5 text-center text-xs text-red-700 dark:bg-red-950 dark:text-red-300"
           role="alert"
-          style={{ backgroundColor: `${tokens.colors.danger}22`, color: tokens.colors.danger }}
         >
           {startError}
         </div>
@@ -285,43 +278,29 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs uppercase tracking-wide" style={{ color: tokens.colors.textMuted }}>
+          <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
             {t('common.appName')}
           </p>
-          <h1 className="text-3xl font-display num" style={{ color: tokens.colors.text }}>
-            {code}
-          </h1>
+          <h1 className="num text-3xl font-bold text-gray-900 dark:text-gray-50">{code}</h1>
         </div>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={handleCopy}
-            className="text-sm px-3 min-h-[44px] rounded-lg transition-colors"
-            style={{
-              backgroundColor: tokens.colors.surface,
-              color: tokens.colors.primary,
-              border: `1px solid ${tokens.colors.primary}55`,
-            }}
+            className="min-h-[44px] rounded-full bg-emerald-700 px-4 text-sm font-medium text-white transition-colors"
           >
             {copied ? t('lobby.copied') : t('lobby.copyCode')}
           </button>
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            className="text-sm min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-colors"
-            style={{
-              backgroundColor: tokens.colors.surface,
-              color: tokens.colors.text,
-              border: `1px solid ${tokens.colors.textMuted}33`,
-            }}
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-white text-gray-700 transition-colors dark:bg-gray-800 dark:text-gray-300"
             aria-label={t('common.settings')}
           >
             ⚙
           </button>
         </div>
       </div>
-
-      <hr style={{ borderColor: `${tokens.colors.textMuted}33` }} />
 
       {/* Phase-driven view */}
       {state.phase === 'lobby' ? (
@@ -345,8 +324,6 @@ export function RoomClient({ initialState, code }: { initialState: RoomState; co
         rules={state.rules}
         onSaveRules={handleSaveRules}
         isOwner={isOwner}
-        currentTheme={state.theme as 'modern-minimal' | 'classic-bar' | 'hk-neon' | 'cartoon'}
-        onSwitchTheme={setTheme}
       />
     </main>
   );
@@ -372,13 +349,12 @@ function LobbyView({
   myPlayerId: string | null;
 }) {
   const t = useTranslations();
-  const { tokens } = useTheme();
   const mySeat = state.players.findIndex((p) => p.id === myPlayerId);
   const myPlayer = mySeat >= 0 ? state.players[mySeat] : null;
   return (
     <>
       <section>
-        <p className="text-sm mb-3" style={{ color: tokens.colors.textMuted }}>
+        <p className="mb-3 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
           {t('lobby.playersCount', { count: state.players.length, max: 8 })}
         </p>
         <ul className="flex flex-col gap-2">
@@ -388,15 +364,14 @@ function LobbyView({
             return (
               <li
                 key={p.id}
-                className="flex items-center gap-3 p-3 rounded-xl"
-                style={{ backgroundColor: tokens.colors.surface }}
+                className="flex items-center gap-3 rounded-xl bg-white p-3 dark:bg-gray-800"
               >
                 <AvatarBadge avatar={p.avatar} seed={p.id} seat={i + 1} />
-                <span style={{ color: tokens.colors.text }}>
-                  {isHost && <span style={{ color: tokens.colors.accent }}>★ </span>}
+                <span className="text-gray-900 dark:text-gray-100">
+                  {isHost && <span className="text-amber-600 dark:text-amber-400">★ </span>}
                   {p.nick}
                   {isMe && (
-                    <span style={{ color: tokens.colors.textMuted }}> {t('lobby.you')}</span>
+                    <span className="text-gray-500 dark:text-gray-400"> {t('lobby.you')}</span>
                   )}
                 </span>
               </li>
@@ -405,11 +380,7 @@ function LobbyView({
           {['waiting-a', 'waiting-b'].slice(0, Math.max(0, 2 - state.players.length)).map((key) => (
             <li
               key={key}
-              className="p-3 rounded-xl border border-dashed"
-              style={{
-                borderColor: `${tokens.colors.textMuted}44`,
-                color: tokens.colors.textMuted,
-              }}
+              className="rounded-xl border border-dashed border-gray-300 p-3 text-gray-500 dark:border-gray-600 dark:text-gray-400"
             >
               ⋯ {t('lobby.waiting')}
             </li>
@@ -426,14 +397,11 @@ function LobbyView({
         />
       )}
 
-      <section>
-        <p
-          className="text-xs uppercase tracking-wide mb-2"
-          style={{ color: tokens.colors.textMuted }}
-        >
+      <section className="flex flex-col gap-1 rounded-xl bg-white p-3 dark:bg-gray-800">
+        <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
           {t('lobby.rulesHeader')}
         </p>
-        <p className="text-sm" style={{ color: tokens.colors.text }}>
+        <p className="text-sm text-gray-700 dark:text-gray-300">
           {t('lobby.rulesSummary', {
             count: state.rules.diceCount,
             aceWild: state.rules.aceWild
@@ -452,19 +420,18 @@ function LobbyView({
             type="button"
             onClick={onStart}
             disabled={!canStart || busy}
-            className="py-4 rounded-2xl font-medium disabled:opacity-40 transition-opacity"
-            style={{
-              backgroundColor: canStart ? tokens.colors.primary : tokens.colors.surface,
-              color: canStart ? tokens.colors.bg : tokens.colors.textMuted,
-            }}
+            className={`rounded-2xl py-4 font-medium transition-opacity ${
+              canStart
+                ? 'bg-red-600 text-white disabled:opacity-40'
+                : 'bg-gray-200 text-gray-400 dark:bg-gray-700'
+            }`}
           >
             {canStart ? t('lobby.startGame') : t('lobby.needMorePlayers')}
           </button>
         ) : (
           <p
-            className="py-4 text-center text-sm rounded-2xl"
+            className="rounded-2xl bg-white py-4 text-center text-sm text-gray-500 dark:bg-gray-800 dark:text-gray-400"
             role="status"
-            style={{ backgroundColor: tokens.colors.surface, color: tokens.colors.textMuted }}
           >
             {t('lobby.waitingForHost')}
           </p>
@@ -472,8 +439,7 @@ function LobbyView({
         <button
           type="button"
           onClick={onLeave}
-          className="text-sm py-2"
-          style={{ color: tokens.colors.textMuted }}
+          className="min-h-[44px] py-2 text-sm text-gray-500 dark:text-gray-400"
         >
           {t('lobby.leaveRoom')}
         </button>
@@ -494,7 +460,6 @@ function GameView({
   refetch: () => Promise<void>;
 }) {
   const t = useTranslations();
-  const { tokens } = useTheme();
   const [hand, setHand] = useState<number[] | null>(null);
   const [allHands, setAllHands] = useState<Record<string, number[]> | null>(null);
   const [busy, setBusy] = useState(false);
@@ -634,6 +599,8 @@ function GameView({
   const diceCount = myPlayer?.diceLeft ?? state.rules.diceCount;
   const isMyTurn = state.players[state.currentTurnIdx]?.id === myPlayerId;
   const alivePlayers = state.players.filter((p) => p.alive).length;
+  // Face-count rows under the dice (wxapp DiceRow): pure per-face counts.
+  const summaryRows = hand ? summarizeHand(hand) : [];
 
   async function submitBid(bid: {
     count: number;
@@ -718,12 +685,11 @@ function GameView({
   const isOwner = state.ownerId === myPlayerId;
 
   return (
-    <section className="flex-1 flex flex-col gap-4">
+    <section className="flex flex-1 flex-col gap-4">
       {actionError && (
         <div
-          className="text-xs text-center py-1.5 rounded-lg"
+          className="rounded-lg bg-red-100 py-1.5 text-center text-xs text-red-700 dark:bg-red-950 dark:text-red-300"
           role="alert"
-          style={{ backgroundColor: `${tokens.colors.danger}22`, color: tokens.colors.danger }}
         >
           {actionError}
         </div>
@@ -750,10 +716,8 @@ function GameView({
 
       {state.phase === 'bidding' && <BidChain state={state} />}
 
-      <div
-        className="aspect-square rounded-2xl overflow-hidden flex-shrink-0"
-        style={{ backgroundColor: tokens.colors.surface }}
-      >
+      {/* My dice card (wxapp DiceRow): dice + face-count rows. */}
+      <div className="flex flex-shrink-0 flex-col items-center gap-2 rounded-2xl bg-white py-4 dark:bg-gray-800">
         <DiceScene
           diceCount={diceCount}
           phase={dicePhase}
@@ -761,9 +725,21 @@ function GameView({
           onCollision={(force) => audio.collide('dice', force)}
           onAllSettled={() => audio.settle()}
         />
+        {summaryRows.length > 0 && state.phase !== 'reveal' && (
+          <div className="flex flex-wrap items-center justify-center gap-2 px-3 pb-1">
+            {summaryRows.map((row) => (
+              <span
+                key={row}
+                className="num rounded-lg bg-gray-100 px-2.5 py-1 text-base font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+              >
+                {row}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Own hand for screen readers — the central DiceScene renders it visually. */}
+      {/* Own hand for screen readers — the dice card renders it visually. */}
       {hand && state.phase !== 'reveal' && (
         <p className="sr-only" aria-live="polite">
           {`${t('game.peekHand')}: ${hand.join(', ')}`}
@@ -788,16 +764,15 @@ function GameView({
 
       {myPlayer && !myPlayer.alive && state.phase !== 'game_end' && (
         <p
-          className="text-center text-xs py-1.5 rounded-lg"
+          className="rounded-lg bg-gray-100 py-1.5 text-center text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400"
           role="status"
-          style={{ backgroundColor: tokens.colors.surface, color: tokens.colors.textMuted }}
         >
           💀 {t('game.spectating')}
         </p>
       )}
 
       {state.phase === 'bidding' && !isMyTurn && (
-        <p className="text-center text-sm" style={{ color: tokens.colors.textMuted }}>
+        <p className="text-center text-sm text-gray-500 dark:text-gray-400">
           {t('game.playerTurn', { name: state.players[state.currentTurnIdx]?.nick ?? '?' })}
         </p>
       )}
@@ -814,33 +789,31 @@ function GameView({
           type="button"
           disabled={busy}
           onClick={submitNextRound}
-          className="py-3 rounded-2xl font-medium disabled:opacity-40"
-          style={{ backgroundColor: tokens.colors.primary, color: tokens.colors.bg }}
+          className="rounded-2xl bg-red-600 py-3 font-medium text-white disabled:opacity-40"
         >
           {state.lastChallengeResult.gameEnded ? t('game.toFinalResult') : t('game.nextRound')}
         </button>
       )}
 
       {state.phase === 'game_end' && (
-        <div className="flex flex-col items-center gap-3 mt-4">
-          <p className="text-xl font-display" style={{ color: tokens.colors.accent }}>
+        <div className="mt-4 flex flex-col items-center gap-3">
+          <p className="text-xl font-bold text-gray-900 dark:text-gray-100">
             {t('game.gameEnded')}
           </p>
           {state.lastChallengeResult && state.lastChallengeResult.winnerIdx >= 0 && (
-            <p style={{ color: tokens.colors.text }}>
+            <p className="text-lg text-amber-600 dark:text-amber-400">
               {t('game.champion', {
                 name: state.players[state.lastChallengeResult.winnerIdx]?.nick ?? '?',
               })}
             </p>
           )}
-          <div className="flex gap-3 mt-2 w-full">
+          <div className="mt-2 flex w-full gap-3">
             {isOwner && (
               <button
                 type="button"
                 disabled={busy}
                 onClick={submitRematch}
-                className="flex-1 py-3 min-h-[44px] rounded-2xl font-medium disabled:opacity-40"
-                style={{ backgroundColor: tokens.colors.primary, color: tokens.colors.bg }}
+                className="min-h-[44px] flex-1 rounded-2xl bg-red-600 py-3 font-medium text-white disabled:opacity-40"
               >
                 {t('game.rematch')}
               </button>
@@ -851,8 +824,7 @@ function GameView({
             <button
               type="button"
               onClick={leaveGame}
-              className="flex-1 py-3 min-h-[44px] rounded-2xl font-medium"
-              style={{ backgroundColor: tokens.colors.surface, color: tokens.colors.textMuted }}
+              className="min-h-[44px] flex-1 rounded-2xl bg-white py-3 font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400"
             >
               {t('lobby.leaveRoom')}
             </button>

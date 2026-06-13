@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * Themed error boundary. Uses CSS theme vars (with the :root fallback in
- * globals.css) so it renders correctly even if the failure was inside a provider.
+ * Error boundary. Pure Tailwind light/dark classes so it renders correctly
+ * even if the failure was inside a provider.
  */
 export default function ErrorBoundary({
   reset,
@@ -11,19 +11,15 @@ export default function ErrorBoundary({
   reset: () => void;
 }) {
   return (
-    <main
-      className="min-h-[100dvh] flex flex-col items-center justify-center gap-5 px-6 text-center"
-      style={{ background: 'var(--color-bg)', color: 'var(--color-text)' }}
-    >
+    <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-5 bg-gray-50 px-6 text-center text-gray-900 dark:bg-gray-900 dark:text-gray-100">
       <p className="text-4xl" aria-hidden="true">
         🎲
       </p>
-      <h1 className="text-xl font-display">出错了 · Something went wrong</h1>
+      <h1 className="text-xl font-bold">出错了 · Something went wrong</h1>
       <button
         type="button"
         onClick={reset}
-        className="px-6 min-h-[44px] rounded-2xl font-medium"
-        style={{ background: 'var(--color-primary)', color: 'var(--color-bg)' }}
+        className="min-h-[44px] rounded-2xl bg-red-600 px-6 font-medium text-white"
       >
         重试 · Retry
       </button>

@@ -9,7 +9,7 @@
 
 ## 1. Overview
 
-A multiplayer 大话骰 (Liar's Dice) web app demo. 2-8 players in private rooms joined via 6-character invite codes. Mobile-first with 3D physics-based dice, gyroscope shake-to-roll with magnitude-coupled animation/audio/haptics, four switchable visual themes, and four dimensions of player customization (count / appearance / rules / avatar). Backed by Vercel Fluid Compute + Upstash Redis (state + Pub/Sub via REST SSE pipe).
+A multiplayer 大话骰 (Liar's Dice) web app demo. 2-8 players in private rooms joined via 6-character invite codes. Mobile-first with 3D physics-based dice, gyroscope shake-to-roll with magnitude-coupled animation/audio/haptics, dark/light dual mode in the wxapp design language (2026-06-12 redesign), and player customization (count / rules / avatar). Backed by Vercel Fluid Compute + Upstash Redis (state + Pub/Sub via REST SSE pipe).
 
 This is the **Full Vision** tier (~12-14 day budget): demo-quality polish, not just a working prototype. Includes complete Chinese ruleset (斋, 1 点万能, 中式扩展 劈/反劈/通杀) and the Perudo Palifico variant.
 
@@ -31,13 +31,13 @@ This is the **Full Vision** tier (~12-14 day budget): demo-quality polish, not j
 |---|---|
 | 自定义维度 | 数量 + 外观 + 规则 + 玩家头像化（全部 4 维） |
 | 房间机制 | 私房间，6 位码分享，2-8 人 |
-| 设计风格 | 4 themes 全部支持（modern-minimal / classic-bar / hk-neon / cartoon） |
+| 设计风格 | 单一设计语言：中性灰阶 + red-600 强调 + dark/light 双模式（2026-06-12 起，原 4 主题废弃） |
 | 玩家身份 | 匿名昵称 + Upstash Redis session（URL token，跨设备恢复） |
 | 语言 | 中文优先 + 英文备件切换（next-intl，zh-CN default） |
 | GitHub | github.com/xingfanxia/dahua-dice (public) |
 | Vercel | 现有账号，dahua-dice.vercel.app 默认域名 |
 | 陀螺仪 | DeviceMotion API + 摇晃幅度联动动画 / 音效 / 触觉 |
-| 音效 | 完整支持，4 theme 各一套 pack |
+| 音效 | settle 真采样常开；合成 sprite 默认关（仅 modern pack 接线） |
 | Scope tier | 完整愿景（含中式扩展规则 + Palifico + PWA） |
 
 ## 4. Tech Stack
@@ -85,9 +85,8 @@ side-projects/dahua-dice/
 │   │   ├── RevealStage.tsx            # 揭骰动画+结果
 │   │   └── RulesSummary.tsx           # Lobby 规则总览
 │   ├── theme/
-│   │   ├── ThemeProvider.tsx          # context + design tokens
-│   │   ├── ThemeSwitcher.tsx          # 4 theme 切换
-│   │   └── tokens.ts                  # 4 themes 的 oklch 色板 / 字体 / 资源 map
+│   │   ├── ThemeProvider.tsx          # dark/light mode context（auto/light/dark, localStorage）
+│   │   └── ThemeModeToggle.tsx        # 跟随系统→深色→浅色 pill
 │   ├── customization/
 │   │   ├── CustomizationDrawer.tsx    # 4 维度面板
 │   │   ├── CountPicker.tsx            # 3-7 颗
@@ -527,46 +526,33 @@ Every feature spec'd across 5 states. "Empty" / "loading" / "error" are first-cl
 - Min height: `min-h-[100dvh]` (NOT `100vh` due to iOS Safari viewport jump)
 - Fallback: if `!window.WebGL2RenderingContext`, swap to 2D SVG dice (graceful degrade)
 
-## 12. Theme System
+## 12. Theme System (superseded 2026-06-12 — redesign/match-wxapp)
 
-4 design themes, each defines a complete token set. Switching theme reloads 3D scene assets + audio pack without page refresh.
+> **The original 4-theme system below was REMOVED on 2026-06-12.** The web UI now
+> follows the wxapp sibling repo's design language (`dahua-dice-wxapp`
+> `docs/specs/2026-06-11-wxapp-design.md` §5.1): 简洁大方、可读性优先. Everything in
+> the historical table (4 oklch palettes, 5 Google fonts, per-theme motion table,
+> `components/theme/tokens.ts`) no longer exists in code.
 
-| Theme key | Background | Primary | Accent | Display font | UI font | Dice material | Audio pack |
-|---|---|---|---|---|---|---|---|
-| `modern-minimal` | `oklch(0.12 0.02 250)` | `oklch(0.7 0.15 230)` | `oklch(0.75 0.18 50)` orange | Space Grotesk | Inter | Frosted glass / brushed metal | Metal/glass clinks |
-| `classic-bar` | `oklch(0.25 0.04 60)` 酒红木 | `oklch(0.55 0.15 50)` caramel | `oklch(0.85 0.12 80)` cream | Newsreader | Outfit | Ivory + black pips | Wood/leather thuds |
-| `hk-neon` | `oklch(0.15 0.04 320)` | `oklch(0.7 0.25 340)` magenta | `oklch(0.85 0.18 200)` cyan | 华康新综艺 (web font fallback Noto Serif TC) | Outfit | Fishball hand-drawn pips | 港式市井 ambience |
-| `cartoon` | `oklch(0.95 0.03 70)` peach | `oklch(0.75 0.15 30)` peach | `oklch(0.7 0.18 150)` mint | Plus Jakarta Sans | Plus Jakarta Sans | Soft dice with eyes | Q版 啵啵 bops |
+**Current visual system:**
 
-**Token shape** (in `components/theme/tokens.ts`):
-```ts
-type ThemeTokens = {
-  key: 'modern-minimal' | 'classic-bar' | 'hk-neon' | 'cartoon';
-  colors: { bg, surface, primary, accent, text, textMuted, success, danger };
-  fonts: { display, ui };
-  dice: { textureSetUrl, material: 'glass' | 'ivory' | 'painted' | 'soft' };
-  audioPackUrl: string;
-  ambient?: string; // optional background loop
-};
-```
-
-Default theme: `modern-minimal` (best matches 3D + mobile-first showcase).
-
-### Per-theme UI patterns (anti-slop specificity)
-
-Each theme has a distinctive motion + interaction language. Buttons / dice cups / transitions feel DIFFERENT across themes, not just recolored.
-
-| | modern-minimal | classic-bar | hk-neon | cartoon |
-|---|---|---|---|---|
-| **Logo treatment** | Type-only, blue→white gradient, subtle outer glow | 古风篆刻"大話骰"印章红章 | 华康字 + 霓虹光晕 + slight CRT flicker | 圆角字 + 骰子角色作 "0" |
-| **Button hover/press** | Glass-morph w/ orange accent edge; spring-back press | Solid color, no gradient; heavy 4px shadow drop on press | Pixel border (2px), magenta glow on hover, flicker on press | Inflated 3D, squish-bounce on press |
-| **Dice cup material** | Brushed metal cylinder w/ subtle reflections | Leather-wrapped wood w/ stitched seam | Enamel-coated tin (港式茶餐厅风) | Pastel ceramic w/ ribbed texture |
-| **Transition motion** | 200ms ease-out, slight Y-translate | 300ms slow fade w/ warmth | 250ms slight overshoot + scanline pass | 350ms spring w/ bounce |
-| **Confetti / 💀 style** | Geometric particles (triangles, glow) | Wood chips + leaf flutter | Neon 流星 + 红包 | 软糖星星 + 心形泪 |
-| **Cursor / focus ring** | Cyan outline 2px | Brass outline w/ shadow | Magenta + cyan double ring | 粉色虚线 + 弹性 |
-| **Empty-state illustration** | Geometric abstract | 牛仔风 sketch | 港式画风 (李志清 / 王司马) | 厦门浪花动漫 inspired |
-
-These differences should be felt within 5 seconds of switching theme. Use this as the test: if a screenshot of theme A and theme B can be told apart with brightness removed, it's working.
+- **Neutral gray scale + one accent**: standard Tailwind grays (`gray-50/100/700/800/900`),
+  red-600 primary actions (red-500 family, darkened one step so white-on-red text passes
+  WCAG AA 4.5:1 — axe enforces this in `tests/e2e/a11y.spec.ts`), amber secondary
+  (zhai badge / palifico + staleness banners), emerald-700 bid/share buttons.
+- **dark / light dual mode**: follow-system default + manual 3-state override
+  (跟随系统/浅色/深色 pill, persisted to `localStorage['theme-mode']` — same key as the
+  wxapp). `components/theme/ThemeProvider.tsx` toggles a `dark` class on `<html>`;
+  Tailwind v4 `@custom-variant dark` drives every `dark:` variant; an inline script in
+  `app/layout.tsx` applies the class pre-paint (no flash).
+- **One system font stack** (PingFang SC / Segoe UI / Roboto …) — the four display
+  fonts (Space Grotesk / Newsreader / Noto Serif TC / Plus Jakarta) were removed.
+- **Cards**: `rounded-2xl bg-white dark:bg-gray-800` (rounded-xl for list rows), no
+  decorative gradients/glows. Dice are white with gray-900 pips in both modes
+  (`components/dice/dice2d.css`).
+- **Contrast floor (axe wcag2aa)**: muted text is gray-500 on light / gray-400 on dark;
+  gray-600 where it sits on tinted cards (e.g. red-50 current-turn highlight); amber
+  text ≥ amber-700 on amber-100.
 
 ## 13. 4 维度自定义 (in `CustomizationDrawer`)
 

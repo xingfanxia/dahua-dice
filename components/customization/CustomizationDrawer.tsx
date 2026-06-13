@@ -3,8 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
-import { useTheme } from '@/components/theme/ThemeProvider';
-import { THEME_KEYS, type ThemeKey } from '@/components/theme/tokens';
+import { type ThemeMode, useThemeMode } from '@/components/theme/ThemeProvider';
 import type { GameRules } from '@/lib/game-engine/types';
 
 const FOCUSABLE =
@@ -19,21 +18,16 @@ export function CustomizationDrawer({
   rules,
   onSaveRules,
   isOwner,
-  currentTheme,
-  onSwitchTheme,
 }: {
   open: boolean;
   onClose: () => void;
   rules: GameRules;
   onSaveRules: (rules: GameRules) => void;
   isOwner: boolean;
-  currentTheme: ThemeKey;
-  onSwitchTheme: (key: ThemeKey) => void;
 }) {
   const t = useTranslations();
-  const { tokens } = useTheme();
+  const { mode, setMode } = useThemeMode();
   const [diceCount, setDiceCount] = useState<GameRules['diceCount']>(rules.diceCount);
-  const [diceSides, setDiceSides] = useState<6 | 8>(rules.diceSides);
   const [aceWild, setAceWild] = useState(rules.aceWild);
   const [allowZhai, setAllowZhai] = useState(rules.allowZhai);
   const [chineseExt, setChineseExt] = useState(rules.chineseExtensions);
@@ -52,7 +46,6 @@ export function CustomizationDrawer({
   useEffect(() => {
     if (open && !wasOpenRef.current) {
       setDiceCount(rules.diceCount);
-      setDiceSides(rules.diceSides);
       setAceWild(rules.aceWild);
       setAllowZhai(rules.allowZhai);
       setChineseExt(rules.chineseExtensions);
@@ -74,11 +67,11 @@ export function CustomizationDrawer({
 
   function handleSave() {
     // Spread current rules (not DEFAULT_RULES) so non-edited fields like
-    // diceSides / startingBidFactor are preserved across a save.
+    // startingBidFactor / diceSides are preserved across a save. (The 8-sided
+    // option was cut from the UI — wxapp parity; engine + schema keep 6|8.)
     onSaveRules({
       ...rules,
       diceCount,
-      diceSides,
       aceWild,
       allowZhai,
       chineseExtensions: chineseExt,
@@ -86,6 +79,12 @@ export function CustomizationDrawer({
     });
     onClose();
   }
+
+  const MODES: { key: ThemeMode; label: string; icon: string }[] = [
+    { key: 'auto', label: t('common.themeAuto'), icon: '🌗' },
+    { key: 'light', label: t('common.themeLight'), icon: '☀️' },
+    { key: 'dark', label: t('common.themeDark'), icon: '🌙' },
+  ];
 
   return (
     <div
@@ -115,47 +114,36 @@ export function CustomizationDrawer({
       {/* Backdrop — click outside panel dismisses; Esc handler on parent for keyboard. */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard handled at parent role=dialog */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: scrim, not interactive content */}
-      <div
-        onClick={onClose}
-        className="absolute inset-0 backdrop-blur-sm"
-        style={{ backgroundColor: `color-mix(in oklch, ${tokens.colors.bg} 65%, transparent)` }}
-      />
+      <div onClick={onClose} className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" />
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopping propagation, not handling interaction */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: container for dialog content */}
       <div
         ref={panelRef}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md max-h-[85dvh] overflow-y-auto rounded-t-3xl p-6 flex flex-col gap-6"
-        style={{ backgroundColor: tokens.colors.bg, color: tokens.colors.text }}
+        className="relative flex max-h-[85dvh] w-full max-w-md flex-col gap-6 overflow-y-auto rounded-t-3xl bg-gray-50 p-6 text-gray-900 dark:bg-gray-900 dark:text-gray-100"
       >
-        <div
-          className="w-12 h-1 rounded-full mx-auto"
-          style={{ backgroundColor: tokens.colors.textMuted }}
-        />
-        <h2 className="text-2xl font-display">{t('customization.title')}</h2>
+        <div className="mx-auto h-1 w-12 rounded-full bg-gray-300 dark:bg-gray-600" />
+        <h2 className="text-2xl font-bold">{t('customization.title')}</h2>
 
-        {/* Theme switcher (always available) */}
+        {/* dark/light mode (always available) */}
         <section className="flex flex-col gap-2">
-          <h3
-            className="text-xs uppercase tracking-wide"
-            style={{ color: tokens.colors.textMuted }}
-          >
-            {t('customization.themeSection')}
+          <h3 className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            {t('common.theme')}
           </h3>
-          <div className="grid grid-cols-2 gap-2">
-            {THEME_KEYS.map((key) => (
+          <div className="grid grid-cols-3 gap-2">
+            {MODES.map((m) => (
               <button
-                key={key}
+                key={m.key}
                 type="button"
-                onClick={() => onSwitchTheme(key)}
-                className="py-3 rounded-xl text-sm transition-colors"
-                style={{
-                  backgroundColor:
-                    currentTheme === key ? tokens.colors.primary : tokens.colors.surface,
-                  color: currentTheme === key ? tokens.colors.bg : tokens.colors.text,
-                }}
+                onClick={() => setMode(m.key)}
+                aria-pressed={mode === m.key}
+                className={`min-h-[44px] rounded-xl text-sm transition-colors ${
+                  mode === m.key
+                    ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
+                    : 'bg-white text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                }`}
               >
-                {t(`themes.${key}`)}
+                <span aria-hidden>{m.icon}</span> {m.label}
               </button>
             ))}
           </div>
@@ -163,10 +151,7 @@ export function CustomizationDrawer({
 
         {/* Language switcher (always available) */}
         <section className="flex flex-col gap-2">
-          <h3
-            className="text-xs uppercase tracking-wide"
-            style={{ color: tokens.colors.textMuted }}
-          >
+          <h3 className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
             {t('common.language')}
           </h3>
           <LanguageToggle label={t('common.language')} />
@@ -175,61 +160,30 @@ export function CustomizationDrawer({
         {/* Rules (owner only) */}
         {isOwner && (
           <>
-            <section className="flex items-center justify-between">
+            {/* Dice count grid 3-10 (wxapp RulesEditor parity). */}
+            <section className="flex flex-col gap-2">
               <span>{t('customization.diceCount')}</span>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setDiceCount((c) => Math.max(3, c - 1) as 3 | 4 | 5 | 6 | 7)}
-                  className="w-11 h-11 rounded-full"
-                  style={{ backgroundColor: tokens.colors.surface }}
-                  aria-label="−"
-                >
-                  −
-                </button>
-                <span className="text-2xl num">{diceCount}</span>
-                <button
-                  type="button"
-                  onClick={() => setDiceCount((c) => Math.min(7, c + 1) as 3 | 4 | 5 | 6 | 7)}
-                  className="w-11 h-11 rounded-full"
-                  style={{ backgroundColor: tokens.colors.surface }}
-                  aria-label="+"
-                >
-                  +
-                </button>
-              </div>
-            </section>
-
-            {/* Dice sides (6 / 8) — mirrors the solo page selector; the engine,
-                schema and BidPanel already support the 8-sided variant. */}
-            <section className="flex items-center justify-between">
-              <span>{t('customization.diceSides')}</span>
-              <div className="flex gap-2">
-                {([6, 8] as const).map((s) => (
+              <div className="grid grid-cols-4 gap-2">
+                {([3, 4, 5, 6, 7, 8, 9, 10] as const).map((n) => (
                   <button
-                    key={s}
+                    key={n}
                     type="button"
-                    onClick={() => setDiceSides(s)}
-                    className="min-w-[44px] h-11 rounded-xl text-lg num transition-colors"
-                    aria-pressed={diceSides === s}
-                    aria-label={`${s}`}
-                    style={{
-                      backgroundColor:
-                        diceSides === s ? tokens.colors.primary : tokens.colors.surface,
-                      color: diceSides === s ? tokens.colors.bg : tokens.colors.text,
-                    }}
+                    onClick={() => setDiceCount(n)}
+                    aria-pressed={diceCount === n}
+                    className={`num min-h-[44px] rounded-xl text-sm transition-colors ${
+                      diceCount === n
+                        ? 'bg-red-600 font-medium text-white'
+                        : 'bg-white text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                    }`}
                   >
-                    {s}
+                    {n}
                   </button>
                 ))}
               </div>
             </section>
 
             <section className="flex flex-col gap-3">
-              <h3
-                className="text-xs uppercase tracking-wide"
-                style={{ color: tokens.colors.textMuted }}
-              >
+              <h3 className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 {t('customization.rules')}
               </h3>
               <Toggle label={t('customization.aceWild')} value={aceWild} onChange={setAceWild} />
@@ -259,8 +213,7 @@ export function CustomizationDrawer({
             <button
               type="button"
               onClick={handleSave}
-              className="py-4 rounded-2xl font-medium"
-              style={{ backgroundColor: tokens.colors.primary, color: tokens.colors.bg }}
+              className="rounded-2xl bg-red-600 py-4 font-medium text-white"
             >
               {t('customization.save')}
             </button>
@@ -268,7 +221,7 @@ export function CustomizationDrawer({
         )}
 
         {!isOwner && (
-          <p className="text-sm text-center" style={{ color: tokens.colors.textMuted }}>
+          <p className="text-center text-sm text-gray-500 dark:text-gray-400">
             {t('customization.onlyOwnerCanEdit')}
           </p>
         )}
@@ -286,7 +239,6 @@ function Toggle({
   value: boolean;
   onChange: (v: boolean) => void;
 }) {
-  const { tokens } = useTheme();
   // The whole row is the switch so the tap target is ≥44px tall (the visual pill
   // alone is only 28px). role=switch + aria-checked keeps it accessible.
   return (
@@ -296,21 +248,18 @@ function Toggle({
       aria-checked={value}
       aria-label={label}
       onClick={() => onChange(!value)}
-      className="flex items-center justify-between gap-3 w-full min-h-[44px] text-left"
+      className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left"
     >
-      <span style={{ color: tokens.colors.text }}>{label}</span>
+      <span>{label}</span>
       <span
-        className="w-12 h-7 rounded-full relative transition-colors shrink-0"
-        style={{
-          backgroundColor: value ? tokens.colors.success : `${tokens.colors.textMuted}55`,
-        }}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+          value ? 'bg-emerald-600' : 'bg-gray-300 dark:bg-gray-600'
+        }`}
       >
         <span
-          className="absolute top-1 left-1 w-5 h-5 rounded-full transition-transform duration-200 ease-out"
-          style={{
-            backgroundColor: tokens.colors.bg,
-            transform: value ? 'translateX(calc(100% + 0.5rem))' : 'translateX(0)',
-          }}
+          className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white transition-transform duration-200 ease-out ${
+            value ? 'translate-x-[calc(100%+0.5rem)]' : 'translate-x-0'
+          }`}
         />
       </span>
     </button>

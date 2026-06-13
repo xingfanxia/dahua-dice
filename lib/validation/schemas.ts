@@ -33,7 +33,18 @@ export function sanitizeTheme(value: unknown): string {
  * stripped (zod object default), so junk fields can't ride along into Redis.
  */
 export const gameRulesSchema = z.object({
-  diceCount: z.union([z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7)]),
+  // 3-10, in lockstep with GameRules['diceCount'] and the wxapp cloud fn's zod
+  // (its commit 1e4b43e widened both sides together — keep in sync).
+  diceCount: z.union([
+    z.literal(3),
+    z.literal(4),
+    z.literal(5),
+    z.literal(6),
+    z.literal(7),
+    z.literal(8),
+    z.literal(9),
+    z.literal(10),
+  ]),
   aceWild: z.boolean(),
   allowZhai: z.boolean(),
   startingBidFactor: z.number().min(1).max(3),

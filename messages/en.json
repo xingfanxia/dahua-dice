@@ -10,14 +10,16 @@
     "settings": "Settings",
     "close": "Close",
     "theme": "Theme",
-    "language": "Language"
+    "language": "Language",
+    "themeAuto": "System",
+    "themeLight": "Light",
+    "themeDark": "Dark"
   },
   "home": {
     "title": "Liar's Dice",
     "subtitle": "大话骰",
     "nicknamePlaceholder": "Your name",
     "createRoom": "Create room",
-    "joinRoom": "Join room",
     "joinPrompt": "Enter 6-character invite code",
     "enter": "Enter",
     "nicknameRequired": "Please enter a nickname",
@@ -140,11 +142,7 @@
   },
   "customization": {
     "title": "Rules",
-    "themeSection": "Theme",
     "diceCount": "Dice per player",
-    "diceSides": "Dice sides",
-    "diceCountHelper": "How many dice each",
-    "appearance": "Appearance",
     "rules": "Rules",
     "aceWild": "1s are wild",
     "allowZhai": "Allow zhai (close-call)",
@@ -153,19 +151,10 @@
     "fanpi": "Fanpi (counter-split)",
     "tongsha": "Tongsha (sweep)",
     "palifico": "Palifico (Perudo variant)",
-    "avatar": "Player avatars",
-    "avatarHelper": "Each player picks their dice texture as ID",
-    "enterAvatarPicker": "Enter player picker",
     "save": "Save",
     "onlyOwnerCanEdit": "Only the host can edit rules",
     "saveFailed": "Save failed — rules unchanged",
     "midGameLocked": "Can't change rules mid-game"
-  },
-  "themes": {
-    "modern-minimal": "Modern Minimal",
-    "classic-bar": "Classic Bar",
-    "hk-neon": "HK Neon",
-    "cartoon": "Cartoon"
   },
   "avatars": {
     "numeric": "Seat number",
@@ -189,7 +178,6 @@
     "reroll": "Roll again",
     "rolling": "Rolling…",
     "diceCount": "Dice",
-    "sides": "Sides",
     "cover": "Cover",
     "peek": "Peek",
     "coveredHint": "Covered · tap to peek",

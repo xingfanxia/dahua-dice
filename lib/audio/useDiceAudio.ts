@@ -2,7 +2,6 @@
 
 import type { Howl } from 'howler';
 import { useEffect, useRef } from 'react';
-import { useTheme } from '@/components/theme/ThemeProvider';
 import { getPack } from './howl-instance';
 
 /**
@@ -29,7 +28,6 @@ const AUDIO_ENABLED = process.env.NEXT_PUBLIC_AUDIO_ENABLED === 'true';
  * Concurrent playback is capped at 6 (spec §15): the oldest sound is evicted.
  */
 export function useDiceAudio() {
-  const { tokens } = useTheme();
   const howlRef = useRef<Howl | null>(null);
   const settleRef = useRef<Howl | null>(null);
   const lastCollideAt = useRef(new Map<string, number>());
@@ -43,8 +41,10 @@ export function useDiceAudio() {
   useEffect(() => {
     if (!AUDIO_ENABLED) return; // sound disabled — don't even fetch the sprite sheet
     // Sprite map mirrors scripts/audio/generate-sprites.mjs exactly (5500ms total).
+    // Single sprite pack since the 4-theme system was removed; the per-theme
+    // packs still exist under public/audio/ but only `modern` is wired.
     const pack = getPack({
-      url: tokens.audioPackPath.replace(/\.json$/, ''),
+      url: '/audio/modern',
       sprite: {
         collide: [0, 200],
         shake: [200, 1200, true],
@@ -57,10 +57,8 @@ export function useDiceAudio() {
       },
     });
     howlRef.current = pack;
-    return () => {
-      // Packs are cached across theme switches — don't unload per theme change.
-    };
-  }, [tokens.audioPackPath]);
+    // Packs are cached in howl-instance — no unload on unmount.
+  }, []);
 
   // Cap concurrent sounds at 6 — evict the oldest (spec §15). Stopping an already-
   // finished id is a harmless no-op, so this stays correct without per-sound 'end'
