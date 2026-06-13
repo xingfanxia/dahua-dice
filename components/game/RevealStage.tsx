@@ -3,9 +3,8 @@
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import type { RoomState } from '@/lib/game-engine/types';
+import { PipDie } from '../dice/PipDie';
 import { AvatarBadge } from './AvatarBadge';
-
-const DICE_GLYPHS = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅', '7', '8'];
 
 export function RevealStage({
   state,
@@ -82,22 +81,17 @@ export function RevealStage({
                   </span>
                 )}
               </span>
-              <div
-                className="flex gap-1 text-2xl"
-                role="img"
-                aria-label={`${p.nick}: ${hand.join(', ')}`}
-              >
+              <div className="flex gap-1.5" role="img" aria-label={`${p.nick}: ${hand.join(', ')}`}>
                 {hand.map((face, j) => {
                   const counted = face === verified.face || (face === 1 && wildCount);
                   return (
-                    <span
-                      /* biome-ignore lint/suspicious/noArrayIndexKey: positional dice */
+                    <PipDie
+                      // biome-ignore lint/suspicious/noArrayIndexKey: positional dice
                       key={j}
-                      aria-hidden
-                      className={counted ? 'text-amber-500' : 'text-gray-700 dark:text-gray-300'}
-                    >
-                      {DICE_GLYPHS[face - 1]}
-                    </span>
+                      face={face}
+                      size={28}
+                      highlighted={counted}
+                    />
                   );
                 })}
               </div>
@@ -111,10 +105,10 @@ export function RevealStage({
           <p className="text-sm uppercase tracking-wide text-amber-800 dark:text-amber-300">
             {kindLabel}
           </p>
-          <p className="text-gray-900 dark:text-gray-100">
+          <p className="flex items-center gap-1.5 text-gray-900 dark:text-gray-100">
             {t('game.bidLabel')} <span className="num">{verified.count}</span>
             {' × '}
-            {DICE_GLYPHS[verified.face - 1]} · {t('game.actualLabel')}{' '}
+            <PipDie face={verified.face} size={20} /> · {t('game.actualLabel')}{' '}
             <span className="num">{result.actualCount}</span>
           </p>
           {loserNames && (

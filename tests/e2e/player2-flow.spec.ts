@@ -1,5 +1,5 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
-import { createRoom, joinViaInvite, startGame } from './helpers';
+import { createRoom, joinViaInvite, openCup, startGame } from './helpers';
 
 /**
  * Regression coverage for the bugs the happy-path test missed: it only had
@@ -30,15 +30,18 @@ test.describe('two-player full flow', () => {
     await joinViaInvite(bob, code, 'Bob');
     await startGame(alice);
 
-    // Each player can SEE their own dice (the 2D renderer shows the hand): the
-    // dice tray renders >= 5 dice for both. Language-agnostic class selectors.
+    // Open each player's cup (#8 roll ritual) so the dice reveal, then assert each
+    // player can SEE their own dice (the 3D cube renderer shows the hand): the dice
+    // tray renders >= 5 cubes for both. Language-agnostic class selectors.
+    await openCup(alice);
+    await openCup(bob);
     await expect(alice.locator('.dice2d-root')).toBeVisible({ timeout: 15000 });
     await expect(bob.locator('.dice2d-root')).toBeVisible({ timeout: 15000 });
     await expect
-      .poll(() => alice.locator('.dice2d-die').count(), { timeout: 15000 })
+      .poll(() => alice.locator('.dice2d-cube').count(), { timeout: 15000 })
       .toBeGreaterThanOrEqual(5);
     await expect
-      .poll(() => bob.locator('.dice2d-die').count(), { timeout: 15000 })
+      .poll(() => bob.locator('.dice2d-cube').count(), { timeout: 15000 })
       .toBeGreaterThanOrEqual(5);
 
     // Alice (first turn) opens the bidding.
@@ -63,11 +66,14 @@ test.describe('two-player full flow', () => {
     const next = alice.getByRole('button', { name: '下一局' });
     if (await next.isVisible().catch(() => false)) {
       await next.click();
+      // New round → cups close again; open them to reveal the re-rolled dice.
+      await openCup(alice);
+      await openCup(bob);
       await expect
-        .poll(() => alice.locator('.dice2d-die').count(), { timeout: 15000 })
+        .poll(() => alice.locator('.dice2d-cube').count(), { timeout: 15000 })
         .toBeGreaterThanOrEqual(4);
       await expect
-        .poll(() => bob.locator('.dice2d-die').count(), { timeout: 15000 })
+        .poll(() => bob.locator('.dice2d-cube').count(), { timeout: 15000 })
         .toBeGreaterThanOrEqual(4);
       // Whichever player holds the new round's turn shows a bid button. (alice and
       // bob are separate pages, so check each rather than .or() across frames.)

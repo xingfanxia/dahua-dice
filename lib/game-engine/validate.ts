@@ -63,12 +63,12 @@ export function isValidBid(
     return { ok: false, reason: 'break_zhai_needs_2x' };
   }
 
-  // 转斋 (entering zhai from 飞): 1s stop counting → the qualifying pool roughly
-  // halves, so the count may DROP to ceil(prev/2) and the face is then free.
-  // (AX 实牌规则 2026-06-12: 叫 4个4 可斋叫 3个5 —— 少叫；symmetric to 破斋 ×2.)
+  // 转斋 (entering zhai from 飞): 1s stop counting, so the named-face pool shrinks
+  // — the count may drop by AT MOST ONE (next.count ≥ prev.count − 1) and the face
+  // is then free. (AX 实牌规则 2026-06-12: 叫 4个4 可斋叫 3个X —— 少叫一个.)
   if (!prev.isZhai && next.isZhai) {
-    if (next.count >= Math.ceil(prev.count / 2)) return { ok: true };
-    return { ok: false, reason: 'zhai_below_half' };
+    if (next.count >= prev.count - 1) return { ok: true };
+    return { ok: false, reason: 'zhai_count_too_low' };
   }
 
   // Same regime (both 飞 or both 斋): standard raise — count up, or same count + face up.

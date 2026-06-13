@@ -16,7 +16,7 @@
 2. **`vercel.json` MUST set `framework: "nextjs"` explicitly.** Without it, Vercel auto-detection silently picks `@vercel/static-build` for Next 16, producing builds with **zero server functions**. Symptom: every app route 404s (incl. `/`, `/api/*`), but `/public/` static assets serve fine. The deploy still shows "Ready" — the bug is invisible until you actually hit the URL. See [[feedback_vercel_nextjs_framework_detection]].
 3. **Next.js 16 calls it `proxy`, not `middleware`.** File is `proxy.ts` at repo root, export name MUST be `function proxy(req: NextRequest)`. If you write `middleware`, build fails.
 4. **Lua scripts are JS template strings** in `lib/lua/scripts.ts`, NOT `.lua` files. They are now **atomic mutations + thin version-CAS commits only**: `joinRoom` / `startGame` / `placeBid` / `setAvatar` / `leaveRoom` / `rematch` / `commitState` / `commitRound`. Challenge/劈/通杀/nextRound resolution is computed in Node (see Game engine), NOT in Lua. `runScript` in `lib/lua/run.ts` calls `redis.eval`. ⚠ **Redis cjson.encode returns `nil` (not a string) for a table with a SHARED sub-table reference** → always build separate table literals (this silently broke every bid once).
-5. **Dice rolls must be server-side** (`lib/room/dice-rng.ts` uses `crypto.randomInt`). Client UI is decorative — the 2D dice (`components/dice/Dice2D`) tumble then settle on the fetched hand, but the authoritative hand is what the server stores in `room:{code}:hands`.
+5. **Dice rolls must be server-side** (`lib/room/dice-rng.ts` uses `crypto.randomInt`). Client UI is decorative — the 3D cube dice (`components/dice/Dice2D`) tumble then settle on the fetched hand, but the authoritative hand is what the server stores in `room:{code}:hands`.
 6. **Single design language (2026-06-12 redesign, matches the wxapp sibling)**: neutral Tailwind grays + red-600 accent + amber secondary, dark/light dual mode. `components/theme/ThemeProvider.tsx` = mode context (auto/light/dark, `localStorage['theme-mode']`, `dark` class on `<html>`); pre-paint inline script in `app/layout.tsx` prevents flash. NO per-theme tokens (tokens.ts deleted); style with Tailwind classes + `dark:` variants only.
 7. **Anti-AI-slop applies** (from `~/.claude/CLAUDE.md` design rules): no Lucide / `100vh` / centered hero grids; `min-h-[100dvh]`. Typography is intentionally the system sans stack (wxapp parity — the 4 display fonts were removed 2026-06-12). **Contrast floor**: axe wcag2aa runs in e2e — muted text ≥ gray-500 on light bg, white-on-color buttons need the 600-step shade (red-600 / emerald-700).
 
@@ -28,20 +28,20 @@
 | Deploy | Vercel Fluid Compute (maxDuration 300s Hobby / 800s Pro for SSE) |
 | State | Upstash Redis (HTTP client + Lua eval for CAS) |
 | Pub/Sub | Upstash REST `/subscribe/{channel}` SSE pipe |
-| Dice | 2D DOM/CSS renderer (`components/dice/Dice2D` + `dice2d.css`) — transform/opacity tumble, white die + gray-900 pips in both modes, no WebGL/Three.js |
+| Dice | CSS **3D cube** renderer (`components/dice/Dice2D` + `dice2d.css`) — perspective + preserve-3d, 6 pip faces, transition-driven spin+land (no keyframe snap); shared `PipDie` SVG for the inline dice in reveal/bid/chain (replaced the old emoji glyphs). White die + gray-900 pips both modes, no WebGL/Three.js |
 | Audio | `howler` v2 — settle = real CC0 sample (Kenney dice-throw-1, always on); other 7 slots = ffmpeg-synth sprites behind `NEXT_PUBLIC_AUDIO_ENABLED` (default off; only the `modern` pack is wired since the 4-theme removal) |
 | i18n | `next-intl` (zh-CN default + en, parity-checked). Default is zh-CN (no Accept-Language auto-switch); English is opt-in via the LanguageToggle (`components/i18n/LanguageToggle.tsx` → `setLocale` server action sets the `locale` cookie). |
 | UI | Tailwind v4 + React local state (no external state lib) |
 | Validation | Zod at API boundaries (`lib/validation/schemas.ts`) + Redis INCR rate limiter (`lib/rate-limit.ts`; 30/min action · 15/min room · 20/min session, all per-IP/session; `RATE_LIMIT_DISABLED=1` opt-out for e2e only) |
 | Lint | Biome v2 (replaces ESLint + Prettier; CSS formatter disabled — Tailwind v4 syntax incompatible) |
-| Test | Vitest (83 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / full-game-to-rematch / solo / 劈 / palifico / axe a11y; 32 tests, chromium + webkit — dice-sides spec removed with the 8-sided UI option) |
+| Test | Vitest (102 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / full-game-to-rematch / solo / **bot** / 劈 / palifico / axe a11y; 34 tests, chromium + webkit) |
 
 ## Commands
 
 ```bash
 pnpm dev            # http://localhost:3000
 pnpm build          # production build (~1.5-2s)
-pnpm test           # 83 unit + integration tests
+pnpm test           # 102 unit + integration tests
 pnpm e2e            # Playwright e2e (auto-starts a dev server); browsers: playwright install chromium webkit
 PLAYWRIGHT_PORT=3100 pnpm e2e   # use when :3000 is taken by another project's dev server (reuseExistingServer would grab it)
 pnpm lint:fix       # Biome autofix
@@ -55,6 +55,7 @@ vercel --prod --scope panpanmao   # deploy
 |---|---|---|
 | GET | `/` | Home — nickname + 创建/加入 + 线下/单人模式 entry |
 | GET | `/solo` | Offline / solo dice-cup — local `crypto` rolls, no room/network (`app/solo/SoloClient.tsx`) |
+| GET | `/bot` | 人机模式 — LOCAL single-device game vs a probability-model bot, no room/server (`app/bot/BotClient.tsx`, engine reused via `lib/bot/`) |
 | GET | `/room/[code]` | Room (lobby + game, phase-driven) |
 | POST | `/api/room` | Create room → return code + token |
 | GET | `/api/room/[code]` | Public room info (phase, playerCount, joinable) |
@@ -89,33 +90,35 @@ Required in `.env.local` (auto-pulled from Vercel Production scope):
 ## Game engine
 
 Pure, unit-tested functions in `lib/game-engine/`:
-- `types.ts` — Face, Phase, Bid, GameRules (DEFAULT_RULES), Player, RoomState (+ `bidChain`, `palificoActive/BidderId/Triggered`), ChallengeOutcome (kind / loserIds / diceLost)
-- `validate.ts` — `isValidBid(prev, next, rules, alive, opts?)` — zhai opener / break-zhai 2x / 转斋 (normal raise) / 叫1必斋 / total-dice cap / Palifico count-lock
-- `round.ts` — **the runtime resolution engine**: `resolveChallenge` (开) / `resolvePi` (劈) / `resolveTongsha` (通杀) / `prepareNextRound` (+ Palifico setup). Pure `(state, hands) → { state, outcome }`.
+- `types.ts` — Face, Phase, Bid, GameRules (DEFAULT_RULES + **`endMode` / `knockoutLosses` / `scoreRounds`**), Player (+ `lossCount`), RoomState (+ `bidChain`, `palificoActive/BidderId/Triggered`), ChallengeOutcome (kind / loserIds / diceLost), `EndMode`
+- `validate.ts` — `isValidBid(prev, next, rules, alive, opts?)` — zhai opener / break-zhai 2x / **转斋 (count ≥ prev−1, face free; reason `zhai_count_too_low`)** / 叫1必斋 / total-dice cap / Palifico count-lock
+- `round.ts` — **the runtime resolution engine**: `resolveChallenge` (开) / `resolvePi` (劈) / `resolveTongsha` (通杀) / `prepareNextRound` (+ Palifico setup). Pure `(state, hands) → { state, outcome }`. **`applyLoss` records `lossCount` + applies the per-`endMode` consequence (attrition removes dice & eliminates; party/knockout/score keep dice); `finalize` branches game-end/winner on the mode.**
 
 **Architecture (important)**: 开/劈/通杀/nextRound are computed in **Node** via `round.ts` (unit-tested), then committed atomically via a thin version-CAS Lua (`commitState` / `commitRound`). The tested code IS the runtime — there is NO separate untested Lua re-implementation of the rules. (`resolve.ts` / `state-machine.ts` / `extensions.ts` were deleted — they were dead code that duplicated the rules.)
 
 Pinned 中式扩展 / Palifico semantics: see design spec §10/§10B. `lib/room/resolution.ts` = `readHands` (tolerant parse) + `normalizeState` (coerce cjson-`{}` arrays) + `GAME_TTL`. Boundary validation via Zod (`lib/validation/schemas.ts`); rate limit via `lib/rate-limit.ts` (30/min action, 15/min room).
 
-All unit-tested (73 unit + integration, full game simulated end-to-end via `round.ts`). Live path covered by Playwright e2e incl. 通杀 + player-2 counter-bid + full-game-to-rematch journeys. ⚠ **The opening-bid floor MUST be clamped to total table dice** (`getStartingBidThreshold(..., totalDice)`) — an unclamped floor (e.g. 1v1 with 1 die each: floor 3 > table 2) leaves the round opener with zero legal actions and softlocks the game.
+All unit-tested (102 unit + integration, full game simulated end-to-end via `round.ts`). Live path covered by Playwright e2e incl. 通杀 + player-2 counter-bid + full-game-to-rematch journeys. ⚠ **The opening-bid floor MUST be clamped to total table dice** (`getStartingBidThreshold(..., totalDice)`) — an unclamped floor (e.g. 1v1 with 1 die each: floor 3 > table 2) leaves the round opener with zero legal actions and softlocks the game.
 
 ## File layout
 
 ```
 app/
 ├── api/              # Route Handlers (server-only)
-├── room/[code]/      # Lobby + game (RoomClient.tsx is the client component)
+├── room/[code]/      # Lobby + game (RoomClient.tsx — turn banner / current-call hero / 开盅 cup ritual / waiting card)
 ├── solo/             # Offline solo dice-cup (SoloClient.tsx — local rolls, no room/network)
+├── bot/              # 人机模式 — local single-device game vs the bot (BotClient.tsx; reuses room components)
 └── layout.tsx        # system font stack + ThemeProvider + pre-paint dark-mode script + manifest
 components/
-├── dice/             # Dice2D (2D DOM/CSS dice + roll animation) / DiceScene (wrapper) / dice2d.css
-├── game/             # BidPanel / PlayerRing / BidChain / RevealStage / AvatarBadge / useRoomEvents
+├── dice/             # Dice2D (CSS 3D cube + roll) / PipDie (inline SVG die) / DiceScene (wrapper) / dice2d.css
+├── game/             # BidPanel (prominent 斋 toggle) / PlayerRing / BidChain / RevealStage / AvatarBadge / useRoomEvents
 ├── theme/            # ThemeProvider (dark/light mode context) + ThemeModeToggle pill
-├── customization/    # CustomizationDrawer (dark/light mode + language + dice count 3-10 grid + rules toggles incl 中式扩展) / AvatarPicker
+├── customization/    # CustomizationDrawer (mode + language + dice count + rules toggles + 结算模式/endMode selector + N/K steppers) / AvatarPicker
 └── shake/            # useShakeDetector (DeviceMotion + iOS perm; auto-grants on Android)
 lib/
 ├── auth/             # session.ts (generators + validator) + session-store.ts + membership.ts
 ├── game-engine/      # types / validate / round  (resolve/state-machine/extensions DELETED — see Game engine)
+├── bot/              # policy.ts (pure binomial decision + 3 difficulties) + local-game.ts (in-memory game loop reusing round.ts)
 ├── room/             # invite-code (no 0/1/I/L/O) + dice-rng + resolution (readHands / normalizeState / GAME_TTL)
 ├── solo/             # roll.ts — client-side crypto dice for the offline solo mode (no server)
 ├── lua/              # scripts.ts (8 atomic + commit Lua scripts as JS strings) + run.ts
@@ -123,7 +126,7 @@ lib/
 ├── audio/            # howl-instance + useDiceAudio
 ├── rate-limit.ts     # Redis INCR fixed-window limiter
 └── redis.ts          # Upstash client + REST URL/token exports
-tests/                # unit + integration (73) + e2e/ (18 Playwright, chromium + webkit)
+tests/                # unit + integration (102) + e2e/ (34 Playwright, chromium + webkit)
 scripts/audit/        # browser playability harness (2p full game / 3p elimination / refresh)
 docs/                 # specs / plans / research (all written before code)
 messages/             # zh-CN.json + en.json (parity-checked)
@@ -149,6 +152,16 @@ Remaining (need a human / physical device — can't be done from a dev session):
 Planned (2026-06-11 — research done, NOT started):
 
 2. **微信小程序版** — friends-only 体验版路线（零备案/审核/版号；个人主体 15 体验成员 + 15 项目成员/appid）。开在**新 sibling repo** `~/projects/side-projects/dahua-dice-wxapp/`（infra 与 web 版零重叠：Taro 4 = React 18、云开发 CloudBase、`db.watch` 实时同步替代 SSE、`lib/game-engine/` 原样移植进云函数）。完整调研与架构映射：`docs/research/2026-06-11-wechat-miniprogram-port.md`；通用 playbook：`~/.claude/references/wechat-miniprogram-friends-only.md`。CloudBase skill 已装（`.claude/skills/cloudbase` → `.agents/skills/cloudbase`，`Skill(cloudbase)` 调用）。⚠ 注册普通小程序 + 工具类目，勿注册小游戏账号；游戏内永远零真钱元素。
+
+Done (2026-06-12 — player-feedback R3, 11-issue batch; branch `feat/player-feedback-2026-06-12`, 102 unit + 34 e2e green; full triage + decisions in `docs/plans/2026-06-12-player-feedback-r3.md`):
+
+- **#3 round-2 freeze (CRITICAL)**: `Dice2D` had one effect early-return that didn't clear `tumbling` → on a round advance whose new hand matched the previous, the dice spun forever. Now every exit path settles. Regression test in `tests/dice2d.test.ts`.
+- **#1 斋叫 discount → `prev−1`** (was `ceil(prev/2)`): `validate.ts` 转斋 tightened; reason `zhai_count_too_low`; BidPanel error + i18n; spec §10B synced. The 斋 toggle was also made a prominent amber switch (the real reason a player thought zhai was missing).
+- **#2 game-end modes**: `endMode` enum (`attrition` default / `party` / `knockout` / `score`) replaces the dead `loseDie` flag — `applyLoss` records `Player.lossCount` + applies the per-mode consequence, `finalize` branches winner/game-end on the mode. Zod `.default()` back-compat + `normalizeState` backfill. **CustomizationDrawer 结算模式 selector + N (knockout) / K (score) steppers**.
+- **#9 dice → real 3D**: `Dice2D` rebuilt as a CSS 3D cube (perspective + preserve-3d, transition-driven spin+land); shared `PipDie` SVG replaces the literal emoji glyphs ⚀⚁⚂ in reveal/bid/chain. Zero bundle, no WebGL.
+- **#6 人机模式** (new `/bot`): LOCAL single-device game — pure `lib/bot/policy.ts` (binomial decision, prefers 飞, can 破斋; 3 difficulties) drives the SAME engine via `lib/bot/local-game.ts`; `BotClient` reuses room components. Zero backend. **#7**: home offline entries promoted to real buttons.
+- **#4/#5/#8/#10/#11 room UX**: visible turn-instruction banner; prominent current-call hero (count × `PipDie`); **开盅 cup ritual** (each round the dice start covered; shake/tap reveals with a tumble — the previously-feedback-only shake detector now opens the cup); a stable waiting card (no bid-panel collapse); clearer game-end controls.
+- **Multipass review** (4-dim + adversarial verify) found & fixed 5: rematch Lua now resets `lossCount` (else knockout/score rematch carried losses); score-mode `lowestLossIdx` skips departed players; bot can no longer be forced to always 开 against a 斋 bid; endMode active desc contrast; lint.
 
 Done (2026-06-12 — UI/UX redesign to wxapp design language; branch `redesign/match-wxapp`, 83 unit + 32 e2e green):
 

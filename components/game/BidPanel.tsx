@@ -4,9 +4,8 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Bid, Face, GameRules, Player, RoomState } from '@/lib/game-engine/types';
 import { getStartingBidThreshold, isValidBid } from '@/lib/game-engine/validate';
+import { PipDie } from '../dice/PipDie';
 import { AvatarBadge } from './AvatarBadge';
-
-const DICE_GLYPHS = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅', '7', '8'];
 
 export function BidPanel({
   state,
@@ -160,7 +159,7 @@ export function BidPanel({
         <p className="text-sm text-gray-500 dark:text-gray-400">
           {t('game.callDescription', {
             count: state.lastBid.count,
-            face: DICE_GLYPHS[state.lastBid.face - 1],
+            face: String(state.lastBid.face),
           })}
           {state.lastBid.isZhai && (
             <span className="ml-1 text-amber-800 dark:text-amber-300">· {t('game.zhai')}</span>
@@ -211,15 +210,15 @@ export function BidPanel({
                 type="button"
                 disabled={disabled}
                 onClick={() => setFace(f)}
-                className={`aspect-square min-h-[44px] rounded-xl text-2xl disabled:opacity-30 ${
+                className={`flex aspect-square min-h-[44px] items-center justify-center rounded-xl disabled:opacity-30 ${
                   active
-                    ? 'bg-red-600 font-semibold text-white'
-                    : 'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-gray-100'
+                    ? 'bg-red-600 ring-2 ring-red-600 ring-offset-1 dark:ring-offset-gray-800'
+                    : 'bg-gray-100 dark:bg-gray-700'
                 }`}
                 aria-pressed={active}
                 aria-label={`${f}`}
               >
-                {DICE_GLYPHS[f - 1]}
+                <PipDie face={f} size={30} />
               </button>
             );
           })}
@@ -227,19 +226,37 @@ export function BidPanel({
       </div>
 
       {rules.allowZhai && !palifico && (
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
-          <input
-            type="checkbox"
-            checked={isZhai}
-            disabled={face === 1}
-            onChange={(e) => setZhaiChecked(e.target.checked)}
-            className="h-4 w-4 accent-amber-600"
-          />
-          {t('game.zhaiCall')}
-          {face === 1 && (
-            <span className="text-gray-500 dark:text-gray-400">· {t('game.faceOneAutoZhai')}</span>
-          )}
-        </label>
+        // Prominent toggle (was an easy-to-miss 16px checkbox — #1: players didn't
+        // realize zhai bidding existed). Amber-filled when on.
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isZhai}
+          disabled={face === 1}
+          onClick={() => setZhaiChecked(!zhaiChecked)}
+          className={`flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border px-3 text-sm transition-colors disabled:opacity-70 ${
+            isZhai
+              ? 'border-amber-500 bg-amber-100 font-medium text-amber-900 dark:border-amber-500 dark:bg-amber-900 dark:text-amber-100'
+              : 'border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
+          }`}
+        >
+          <span className="flex items-center gap-1.5">
+            {t('game.zhaiCall')}
+            {face === 1 && (
+              <span className="text-xs opacity-80">· {t('game.faceOneAutoZhai')}</span>
+            )}
+          </span>
+          <span
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 text-xs ${
+              isZhai
+                ? 'border-amber-600 bg-amber-500 text-white'
+                : 'border-gray-300 dark:border-gray-500'
+            }`}
+            aria-hidden
+          >
+            {isZhai ? '✓' : ''}
+          </span>
+        </button>
       )}
 
       <div className="mt-2 flex gap-3">
@@ -249,7 +266,7 @@ export function BidPanel({
           onClick={() => onBid(candidate)}
           className="flex-1 rounded-2xl bg-emerald-700 py-4 font-medium text-white transition-opacity disabled:opacity-40"
         >
-          {t('game.submitBid', { count, face: DICE_GLYPHS[face - 1] })}
+          {t('game.submitBid', { count, face: String(face) })}
         </button>
         {state.lastBid && (
           <button
@@ -363,6 +380,10 @@ export function BidPanel({
                 });
               case 'break_zhai_needs_2x':
                 return t('errors.breakZhaiNeeds2x');
+              case 'zhai_count_too_low':
+                return t('errors.zhaiCountTooLow', {
+                  min: Math.max(1, (state.lastBid?.count ?? 1) - 1),
+                });
               case 'face_one_must_zhai':
                 return t('errors.faceOneMustZhai');
               case 'palifico_count_locked':

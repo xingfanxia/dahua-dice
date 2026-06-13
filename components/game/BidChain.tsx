@@ -2,9 +2,8 @@
 
 import { useTranslations } from 'next-intl';
 import type { Bid, RoomState } from '@/lib/game-engine/types';
+import { PipDie } from '../dice/PipDie';
 import { AvatarBadge } from './AvatarBadge';
-
-const DICE_GLYPHS = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅', '7', '8'];
 
 /** Human-readable name for a bid's face, for screen readers. */
 function bidLabel(bid: Bid, count: string, face: string, zhai: string): string {
@@ -33,8 +32,12 @@ export function BidChain({ state }: { state: RoomState }) {
         {chain.map((entry, i) => {
           const player = state.players.find((p) => p.id === entry.playerId);
           const latest = i === chain.length - 1;
-          const faceGlyph = DICE_GLYPHS[entry.bid.face - 1];
-          const srLabel = bidLabel(entry.bid, String(entry.bid.count), faceGlyph, t('game.zhai'));
+          const srLabel = bidLabel(
+            entry.bid,
+            String(entry.bid.count),
+            String(entry.bid.face),
+            t('game.zhai'),
+          );
           return (
             <li
               // biome-ignore lint/suspicious/noArrayIndexKey: bid chain is append-only and positional
@@ -62,9 +65,7 @@ export function BidChain({ state }: { state: RoomState }) {
                 <span className="text-gray-400" aria-hidden>
                   ×
                 </span>
-                <span className="text-xl text-gray-900 dark:text-gray-100" aria-hidden>
-                  {faceGlyph}
-                </span>
+                <PipDie face={entry.bid.face} size={22} />
                 {entry.bid.isZhai && (
                   <span
                     className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800 dark:bg-amber-900 dark:text-amber-200"

@@ -117,26 +117,26 @@ describe('isValidBid (zhai transitions)', () => {
     expect(isValidBid(prev, { count: 4, face: 4, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
   });
 
-  it('enters zhai (转斋 from 飞): count may halve to ceil(prev/2), face free (AX 实牌规则)', () => {
+  it('enters zhai (转斋 from 飞): count may drop by at most one (prev−1), face free', () => {
     const prev = { count: 6, face: 4, isZhai: false } as const;
     // count-up into zhai → ok
     expect(isValidBid(prev, { count: 7, face: 4, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
-    // count down to ceil(6/2)=3, face自选 → ok（少叫；AX: 叫6个4 → 斋3个5）
-    expect(isValidBid(prev, { count: 3, face: 5, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
-    expect(isValidBid(prev, { count: 4, face: 2, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
-    // same count + same face into zhai = 去掉万能、更强的同数声明 → ok
+    // same count, free face into zhai = 去掉万能、更强的同数声明 → ok
     expect(isValidBid(prev, { count: 6, face: 4, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
-    // below half (2 < 3) → reject
-    const r = isValidBid(prev, { count: 2, face: 4, isZhai: true }, DEFAULT_RULES, 4);
+    // minus one (5), free face → ok（少叫一个；AX: 叫6个4 → 斋5个5）
+    expect(isValidBid(prev, { count: 5, face: 5, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
+    // dropping by two (4 < 5) → reject
+    const r = isValidBid(prev, { count: 4, face: 4, isZhai: true }, DEFAULT_RULES, 4);
     expect(r.ok).toBe(false);
-    expect(r.ok ? undefined : r.reason).toBe('zhai_below_half');
+    expect(r.ok ? undefined : r.reason).toBe('zhai_count_too_low');
   });
 
-  it('转斋 user example: 4个4 (飞) → 3个5 (斋) accepted', () => {
+  it('转斋 user example: 4个4 (飞) → 3个5 (斋) accepted; only minus-one allowed', () => {
     const prev = { count: 4, face: 4, isZhai: false } as const;
+    // the user's headline example: minus one (3) with a free face → ok
     expect(isValidBid(prev, { count: 3, face: 5, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
-    // ceil(4/2)=2, so 2个 also ok, 1个 rejected
-    expect(isValidBid(prev, { count: 2, face: 6, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
+    // dropping by two or more is now rejected under the prev−1 rule
+    expect(isValidBid(prev, { count: 2, face: 6, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(false);
     expect(isValidBid(prev, { count: 1, face: 6, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(false);
   });
 

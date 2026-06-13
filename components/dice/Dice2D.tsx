@@ -2,86 +2,80 @@
 
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
+import { PIP_LAYOUT } from './PipDie';
 import './dice2d.css';
 
 /**
- * 2D animated dice renderer. DOM/CSS only — no WebGL, no Three.js.
- * Renders the player's own dice as rounded squares with standard d6 pips,
- * tumbling on a new roll then settling on their final faces. Light/dark
- * styling lives in dice2d.css (html.dark selector), no per-theme tokens.
+ * 3D dice renderer. DOM/CSS only — no WebGL, no Three.js (issue #9 upgrade from
+ * the old flat sticker). Each die is a real CSS cube (6 pip faces, perspective)
+ * that tumbles through space and settles onto its dealt face. The roll is driven
+ * purely by a transform transition to an accumulated rotation, so the cube spins
+ * forward a few turns and lands exactly on the final face — no keyframe→transform
+ * snap. Light/dark styling lives in dice2d.css (html.dark selector).
  */
 
 export type DicePhase = 'idle' | 'rolling' | 'settled' | 'revealed';
 
-/** Standard d6 pip positions in a 0..100 coordinate space. */
-const PIP_LAYOUT: Record<number, [number, number][]> = {
-  1: [[50, 50]],
-  2: [
-    [30, 30],
-    [70, 70],
-  ],
-  3: [
-    [30, 30],
-    [50, 50],
-    [70, 70],
-  ],
-  4: [
-    [30, 30],
-    [70, 30],
-    [30, 70],
-    [70, 70],
-  ],
-  5: [
-    [30, 30],
-    [70, 30],
-    [50, 50],
-    [30, 70],
-    [70, 70],
-  ],
-  6: [
-    [30, 30],
-    [70, 30],
-    [30, 50],
-    [70, 50],
-    [30, 70],
-    [70, 70],
-  ],
+const TUMBLE_MS = 900; // total spin duration before the first die lands
+const STAGGER_MS = 120; // delay between successive dice landing
+const POP_MS = 220; // settle scale-pop window
+const DIE_PX = 72; // rendered die size
+
+// A mild constant 3/4 tilt so a die at rest still reads as a solid cube (you
+// glimpse two side faces) while keeping the dealt face clearly readable.
+const TILT = { x: -16, y: 14 };
+
+// Rotation that brings each value's face to the front. Face values are fixed on
+// the cube (opposite faces sum to 7): front 1 / back 6 / right 3 / left 4 / top 5
+// / bottom 2 — see the .dice2d-face--* placement in dice2d.css.
+const FACE_ROT: Record<number, { x: number; y: number }> = {
+  1: { x: 0, y: 0 },
+  2: { x: 90, y: 0 },
+  3: { x: 0, y: -90 },
+  4: { x: 0, y: 90 },
+  5: { x: -90, y: 0 },
+  6: { x: 0, y: 180 },
 };
 
-const TUMBLE_MS = 900; // total tumble duration before the first die settles
-const STAGGER_MS = 120; // delay between successive dice settling
-const CYCLE_MS = 80; // how often a tumbling die's face flickers
-const POP_MS = 220; // settle scale-pop window
-const DIE_PX = 72; // rendered die size (bumped with the wxapp's 真机 "too small" feedback)
-
-const randomFace = (sides: number) => 1 + Math.floor(Math.random() * sides);
+type Rot = { x: number; y: number };
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined') return false;
   return !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 }
 
-/** A single die face: rounded square + pips (or centered number for 7/8). */
-function DieFace({ face, sides, popping }: { face: number; sides: number; popping: boolean }) {
-  const pips = PIP_LAYOUT[face];
+/** Rest orientation for `face` nearest to `prev` (minimal movement, no extra spin). */
+function alignToFace(prev: Rot, face: number): Rot {
+  const base = FACE_ROT[face] ?? FACE_ROT[1];
+  const tx = base.x + TILT.x;
+  const ty = base.y + TILT.y;
+  return {
+    x: tx + 360 * Math.round((prev.x - tx) / 360),
+    y: ty + 360 * Math.round((prev.y - ty) / 360),
+  };
+}
+
+/** Forward-spinning target for `face`: a few full turns past `prev`, landing on it. */
+function spinToFace(prev: Rot, face: number, i: number): Rot {
+  const base = FACE_ROT[face] ?? FACE_ROT[1];
+  const tx = base.x + TILT.x;
+  const ty = base.y + TILT.y;
+  const turnsX = Math.floor((prev.x - tx) / 360) + 2 + (i % 2);
+  const turnsY = Math.floor((prev.y - ty) / 360) + 3 - (i % 2);
+  return { x: tx + 360 * turnsX, y: ty + 360 * turnsY };
+}
+
+/** One cube face: the fixed pip layout for its value. */
+function CubeFace({ value, pos }: { value: number; pos: string }) {
+  const pips = PIP_LAYOUT[value];
   return (
-    <div
-      className="dice2d-die"
-      data-popping={popping ? 'true' : undefined}
-      style={{ width: DIE_PX, height: DIE_PX }}
-    >
-      {pips ? (
+    <div className={`dice2d-face dice2d-face--${pos}`}>
+      {pips && (
         <svg viewBox="0 0 100 100" className="dice2d-pips" aria-hidden="true">
-          <title>{face}</title>
           {pips.map(([cx, cy]) => (
-            <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={9} className="dice2d-pip" />
+            <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={10} className="dice2d-pip" />
           ))}
         </svg>
-      ) : (
-        // 7/8 (8-sided variant): no canonical pip layout — render the number.
-        <span className="dice2d-num" aria-hidden="true">
-          {face > sides ? sides : face}
-        </span>
       )}
     </div>
   );
@@ -91,96 +85,80 @@ export function Dice2D({
   diceCount,
   phase,
   hand,
-  sides = 6,
   onCollision,
   onAllSettled,
 }: {
   diceCount: number;
   phase: DicePhase;
   hand?: number[] | null;
-  /** Faces per die (6 standard, 8 for the 8-sided variant). */
+  /** Accepted for API compat; the cube models a d6 (8-sided is cut from the live UI). */
   sides?: number;
   onCollision?: (force: number) => void;
   onAllSettled?: (faces: number[]) => void;
 }) {
   const hasHand = !!hand && hand.length > 0;
-  // Number of dice shown: the hand if present, else the count.
   const count = hasHand ? (hand as number[]).length : Math.max(0, diceCount);
-  // Final faces to settle on: the real hand if known, otherwise neutral 1s.
+  // Final faces to settle on: the real hand if known, else neutral 1s.
   const finalFaces: number[] = hasHand
     ? (hand as number[])
     : Array.from({ length: count }, () => 1);
 
-  // Faces currently displayed. Flicker during a tumble; otherwise = finalFaces.
-  const [displayFaces, setDisplayFaces] = useState<number[]>(finalFaces);
-  // Which dice are mid-tumble (drives the CSS keyframe + face flicker).
-  const [tumbling, setTumbling] = useState<boolean[]>(() => finalFaces.map(() => false));
-  // Which dice are doing the settle "pop" (scale 1.12 -> 1).
+  // Which dice are mid-roll (drives data-tumbling + the long transition duration).
+  const [rolling, setRolling] = useState<boolean[]>(() => finalFaces.map(() => false));
+  // Settle "pop" (scale overshoot).
   const [popping, setPopping] = useState<boolean[]>(() => finalFaces.map(() => false));
+  // Per-die accumulated cube rotation (degrees). Starts aligned to the faces.
+  const [rot, setRot] = useState<Rot[]>(() =>
+    finalFaces.map((f) => alignToFace({ x: 0, y: 0 }, f)),
+  );
 
-  // Latest callbacks/values without retriggering the animation effect.
   const onAllSettledRef = useRef(onAllSettled);
   const onCollisionRef = useRef(onCollision);
   const finalFacesRef = useRef(finalFaces);
-  const sidesRef = useRef(sides);
   onAllSettledRef.current = onAllSettled;
   onCollisionRef.current = onCollision;
   finalFacesRef.current = finalFaces;
-  sidesRef.current = sides;
 
-  // Signature identifying "a new roll": changes when phase enters 'rolling' or
-  // the dealt hand changes to a different set of faces.
+  // Signature identifying "a new roll": entering 'rolling', or the dealt hand changing.
   const rollKey = `${phase === 'rolling' ? 'rolling' : 'static'}|${(hand ?? []).join(',')}`;
   const seenRollKey = useRef<string | null>(null);
 
-  // Deps are intentionally [rollKey, phase]: rollKey already encodes the hand
-  // identity, and callbacks/sides/finalFaces are read live via refs so a new
-  // closure for them never restarts an in-flight tumble.
   useEffect(() => {
     const target = finalFacesRef.current;
     const n = target.length;
-
-    // Only animate for roll-bearing transitions: entering 'rolling', or a hand
-    // arriving/changing. Static phases with a stable hand just render faces.
     const isRollTrigger = phase === 'rolling' || n > 0;
+
+    // Snap to rest showing the final faces. Every non-animating exit path runs this
+    // so a prior cut-off roll can never strand a die mid-tumble (issue #3 freeze).
+    const settle = () => {
+      setRolling(target.map(() => false));
+      setPopping(target.map(() => false));
+      setRot((prev) => target.map((f, i) => alignToFace(prev[i] ?? { x: 0, y: 0 }, f)));
+    };
+
     if (!isRollTrigger) {
       seenRollKey.current = rollKey;
-      setTumbling(target.map(() => false));
-      setPopping(target.map(() => false));
-      setDisplayFaces(target);
+      settle();
       return;
     }
-    if (seenRollKey.current === rollKey) return;
-    // Mark this rollKey "consumed" only on completion (reduced-motion branch and
-    // the settle branch below), NOT here. Under React Strict Mode the effect runs
-    // mount → cleanup → mount; setting it up front would let the cleaned-up first
-    // pass suppress the real second pass, so a reconnect-mid-roll would never tumble.
-
-    // Reduced motion: skip the tumble, show finals immediately, fire once.
+    if (seenRollKey.current === rollKey) {
+      settle();
+      return;
+    }
     if (prefersReducedMotion()) {
       seenRollKey.current = rollKey;
-      setTumbling(target.map(() => false));
-      setPopping(target.map(() => false));
-      setDisplayFaces(target);
+      settle();
       onAllSettledRef.current?.(target);
       return;
     }
 
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    // Mutable view of which dice are still tumbling (read inside the interval).
-    const stillTumbling = target.map(() => true);
-
-    setTumbling(target.map(() => true));
+    // Animate: spin every cube forward to its final face, landing staggered.
+    setRolling(target.map(() => true));
     setPopping(target.map(() => false));
+    setRot((prev) => target.map((f, i) => spinToFace(prev[i] ?? { x: 0, y: 0 }, f, i)));
 
-    // Flicker random faces on dice that are still tumbling.
-    const flicker = setInterval(() => {
-      setDisplayFaces((prev) =>
-        prev.map((f, i) => (stillTumbling[i] ? randomFace(sidesRef.current) : f)),
-      );
-    }, CYCLE_MS);
-
-    // A couple of rattle pulses mid-tumble for audio.
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    // A couple of rattle pulses mid-roll for audio.
     timers.push(
       setTimeout(() => onCollisionRef.current?.(0.6), 120),
       setTimeout(() => onCollisionRef.current?.(0.9), 360),
@@ -191,10 +169,7 @@ export function Dice2D({
       const settleAt = TUMBLE_MS + i * STAGGER_MS;
       timers.push(
         setTimeout(() => {
-          stillTumbling[i] = false;
-          // Stop this die's tumble, lock its final face, trigger the pop.
-          setTumbling((prev) => prev.map((v, j) => (j === i ? false : v)));
-          setDisplayFaces((prev) => prev.map((f, j) => (j === i ? target[j] : f)));
+          setRolling((prev) => prev.map((v, j) => (j === i ? false : v)));
           setPopping((prev) => prev.map((v, j) => (j === i ? true : v)));
           timers.push(
             setTimeout(() => {
@@ -204,7 +179,6 @@ export function Dice2D({
           settledCount += 1;
           if (settledCount === n) {
             seenRollKey.current = rollKey; // consumed only once the roll completes
-            clearInterval(flicker);
             onAllSettledRef.current?.(target);
           }
         }, settleAt),
@@ -212,49 +186,69 @@ export function Dice2D({
     }
 
     return () => {
-      clearInterval(flicker);
       for (const tm of timers) clearTimeout(tm);
     };
   }, [rollKey, phase]);
 
-  // Keep array lengths in sync when count changes outside a roll (e.g. a player
-  // loses a die between rounds while the phase is static).
+  // Keep array lengths in sync when count changes outside a roll (a player loses a
+  // die between rounds while the phase is static).
   useEffect(() => {
     if (phase === 'rolling') return;
-    setDisplayFaces((prev) => (prev.length === count ? prev : finalFacesRef.current));
-    setTumbling((prev) => (prev.length === count ? prev : finalFacesRef.current.map(() => false)));
-    setPopping((prev) => (prev.length === count ? prev : finalFacesRef.current.map(() => false)));
+    const faces = finalFacesRef.current;
+    setRolling((prev) => (prev.length === count ? prev : faces.map(() => false)));
+    setPopping((prev) => (prev.length === count ? prev : faces.map(() => false)));
+    setRot((prev) =>
+      prev.length === count ? prev : faces.map((f) => alignToFace({ x: 0, y: 0 }, f)),
+    );
   }, [count, phase]);
 
   const t = useTranslations('game');
   const ariaLabel = hasHand
-    ? t('yourDice', { faces: displayFaces.join(', ') })
+    ? t('yourDice', { faces: finalFaces.join(', ') })
     : t('diceFaceDown', { count });
 
   return (
     <div className="dice2d-root" role="img" aria-label={ariaLabel}>
       <div className="dice2d-tray">
         {Array.from({ length: count }).map((_, i) => {
-          const isTumbling = tumbling[i] ?? false;
-          const faceDownNow = !hasHand && !isTumbling;
+          const isRolling = rolling[i] ?? false;
+          const faceDownNow = !hasHand && !isRolling;
+          const r = rot[i] ?? { x: TILT.x, y: TILT.y };
           return (
             <div
               // biome-ignore lint/suspicious/noArrayIndexKey: index is the die identity
               key={i}
               className="dice2d-wrap"
-              data-tumbling={isTumbling ? 'true' : undefined}
+              data-tumbling={isRolling ? 'true' : undefined}
+              data-popping={popping[i] ? 'true' : undefined}
+              style={{ width: DIE_PX, height: DIE_PX }}
             >
               {faceDownNow ? (
-                <div
-                  className="dice2d-die dice2d-die--down"
-                  style={{ width: DIE_PX, height: DIE_PX }}
-                >
+                <div className="dice2d-down" style={{ width: DIE_PX, height: DIE_PX }}>
                   <span className="dice2d-q" aria-hidden="true">
                     ?
                   </span>
                 </div>
               ) : (
-                <DieFace face={displayFaces[i] ?? 1} sides={sides} popping={popping[i] ?? false} />
+                <div
+                  className="dice2d-cube"
+                  style={{
+                    width: DIE_PX,
+                    height: DIE_PX,
+                    ['--half' as string]: `${DIE_PX / 2}px`,
+                    transform: `rotateX(${r.x}deg) rotateY(${r.y}deg)`,
+                    transitionDuration: isRolling
+                      ? `${TUMBLE_MS + i * STAGGER_MS}ms`
+                      : `${POP_MS}ms`,
+                  }}
+                >
+                  <CubeFace value={1} pos="front" />
+                  <CubeFace value={6} pos="back" />
+                  <CubeFace value={3} pos="right" />
+                  <CubeFace value={4} pos="left" />
+                  <CubeFace value={5} pos="top" />
+                  <CubeFace value={2} pos="bottom" />
+                </div>
               )}
             </div>
           );

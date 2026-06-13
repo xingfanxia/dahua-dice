@@ -215,15 +215,28 @@ export function HomeClient({
             {err ?? ' '}
           </p>
 
-          {/* offline / solo entry — no room, no network, just a local dice cup */}
-          <button
-            type="button"
-            onClick={() => router.push('/solo')}
-            disabled={busy !== null}
-            className="min-h-[44px] text-center text-sm text-gray-500 underline-offset-4 transition hover:underline disabled:opacity-60 dark:text-gray-400"
-          >
-            🎲 {t('home.soloMode')} →
-          </button>
+          {/* offline modes — no room, no network. Promoted to real secondary
+              buttons (the old tiny text link read as a footnote). */}
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => router.push('/solo')}
+              disabled={busy !== null}
+              className="flex min-h-[52px] items-center justify-center gap-1.5 rounded-2xl border border-gray-200 bg-white text-sm font-medium text-gray-700 transition hover:border-gray-300 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+            >
+              <span aria-hidden>🎲</span>
+              {t('home.soloMode')}
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push('/bot')}
+              disabled={busy !== null}
+              className="flex min-h-[52px] items-center justify-center gap-1.5 rounded-2xl border border-gray-200 bg-white text-sm font-medium text-gray-700 transition hover:border-gray-300 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+            >
+              <span aria-hidden>🤖</span>
+              {t('home.botMode')}
+            </button>
+          </div>
         </div>
 
         {/* footer — language */}

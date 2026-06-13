@@ -39,6 +39,15 @@ export function normalizeState(state: RoomState): RoomState {
   // arrives as an object — coerce those back to [] so .includes/.length are safe.
   return {
     ...state,
+    // Back-fill #2 endMode rules + per-player lossCount for rooms created before
+    // these fields existed, so the rest of the app sees a complete shape.
+    rules: {
+      ...state.rules,
+      endMode: state.rules?.endMode ?? 'attrition',
+      knockoutLosses: state.rules?.knockoutLosses ?? 3,
+      scoreRounds: state.rules?.scoreRounds ?? 5,
+    },
+    players: state.players.map((p) => ({ ...p, lossCount: p.lossCount ?? 0 })),
     bidChain: Array.isArray(state.bidChain) ? state.bidChain : [],
     palificoActive: state.palificoActive ?? false,
     palificoBidderId: state.palificoBidderId ?? null,

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AvatarPicker } from '@/components/customization/AvatarPicker';
 import { CustomizationDrawer } from '@/components/customization/CustomizationDrawer';
 import { type DicePhase, DiceScene } from '@/components/dice/DiceScene';
+import { PipDie } from '@/components/dice/PipDie';
 import { AvatarBadge } from '@/components/game/AvatarBadge';
 import { BidChain } from '@/components/game/BidChain';
 import { BidPanel } from '@/components/game/BidPanel';
@@ -463,6 +464,9 @@ function GameView({
   const [hand, setHand] = useState<number[] | null>(null);
   const [allHands, setAllHands] = useState<Record<string, number[]> | null>(null);
   const [busy, setBusy] = useState(false);
+  // Roll ritual (#8): a round's dice stay in a covered cup until the player shakes
+  // or taps to "开盅". This is the round number whose cup has been opened.
+  const [openedRound, setOpenedRound] = useState(0);
   // Surfaces a swallowed action failure ("can't bid") for ~3s. The root cause of
   // the silent failure was every submit doing `await fetch()` and ignoring the
   // result; flashAction is the shared sink for those errors. A 409 (stale CAS)
@@ -532,8 +536,9 @@ function GameView({
     }
   }, [state.phase, state.lastChallengeResult, audio, myPlayerId, state.players]);
 
-  // Shake → audio coupling (vibration if available). Roll trigger isn't wired yet —
-  // server auto-rolls on start/nextRound, so this is feedback only.
+  // Shake → audio + vibration, AND opens the dice cup for this round (#8 roll
+  // ritual). The server already dealt the hand; the shake just reveals it with a
+  // tumble. Reads fresh state (the hook keeps the latest callback in a ref).
   useShakeDetector((intensity) => {
     if (phaseRef.current === 'rolling' || phaseRef.current === 'bidding') {
       audio.shake(intensity);
@@ -541,6 +546,7 @@ function GameView({
         // Spec §14.4: 50–200ms, scaled by shake intensity.
         navigator.vibrate?.(Math.floor(50 + intensity * 150));
       }
+      if (phaseRef.current === 'bidding') setOpenedRound(state.round);
     }
   });
 
@@ -601,6 +607,14 @@ function GameView({
   const alivePlayers = state.players.filter((p) => p.alive).length;
   // Face-count rows under the dice (wxapp DiceRow): pure per-face counts.
   const summaryRows = hand ? summarizeHand(hand) : [];
+  // #8 roll ritual: the dice stay in a covered cup each round until you 开盅.
+  const cupCovered = state.phase === 'bidding' && amAlive && openedRound !== state.round;
+  const openCup = () => {
+    if (!cupCovered) return;
+    setOpenedRound(state.round);
+    audio.shake(0.7);
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate?.(90);
+  };
 
   async function submitBid(bid: {
     count: number;
@@ -712,32 +726,94 @@ function GameView({
               : ''}
       </p>
 
+      {/* Visible turn / instruction banner (#4) — always tells you what to do. */}
+      {state.phase === 'bidding' && (
+        <p
+          className="rounded-xl bg-white py-2 text-center text-sm font-medium text-gray-900 dark:bg-gray-800 dark:text-gray-100"
+          role="status"
+        >
+          {cupCovered
+            ? t('game.openCupHint')
+            : isMyTurn
+              ? t('game.yourTurnHint')
+              : t('game.waitingTurn', { name: state.players[state.currentTurnIdx]?.nick ?? '?' })}
+        </p>
+      )}
+
       <PlayerRing state={state} myPlayerId={myPlayerId} />
 
-      {state.phase === 'bidding' && <BidChain state={state} />}
-
-      {/* My dice card (wxapp DiceRow): dice + face-count rows. */}
-      <div className="flex flex-shrink-0 flex-col items-center gap-2 rounded-2xl bg-white py-4 dark:bg-gray-800">
-        <DiceScene
-          diceCount={diceCount}
-          phase={dicePhase}
-          hand={hand}
-          onCollision={(force) => audio.collide('dice', force)}
-          onAllSettled={() => audio.settle()}
-        />
-        {summaryRows.length > 0 && state.phase !== 'reveal' && (
-          <div className="flex flex-wrap items-center justify-center gap-2 px-3 pb-1">
-            {summaryRows.map((row) => (
-              <span
-                key={row}
-                className="num rounded-lg bg-gray-100 px-2.5 py-1 text-base font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200"
-              >
-                {row}
+      {/* Current standing call (#11) — the most important info, shown big and always. */}
+      {state.phase === 'bidding' && (
+        <div className="flex flex-col items-center gap-1 rounded-2xl bg-white py-3 dark:bg-gray-800">
+          <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            {t('game.currentCall')}
+          </span>
+          {state.lastBid ? (
+            <div className="flex items-center gap-2">
+              <span className="num text-3xl font-bold text-gray-900 dark:text-gray-100">
+                {state.lastBid.count}
               </span>
-            ))}
-          </div>
-        )}
-      </div>
+              <span className="text-xl text-gray-400" aria-hidden>
+                ×
+              </span>
+              <PipDie face={state.lastBid.face} size={34} />
+              {state.lastBid.isZhai && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                  {t('game.zhai')}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {t('game.waitingFirstBid')}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Bid history — only once there are bids; the empty "waiting" state is
+          already shown by the current-call hero above (avoids a duplicate line). */}
+      {state.phase === 'bidding' && Array.isArray(state.bidChain) && state.bidChain.length > 0 && (
+        <BidChain state={state} />
+      )}
+
+      {/* My dice card (wxapp DiceRow). Covered cup until 开盅 (#8 roll ritual):
+          the hand is already dealt; shaking / tapping reveals it with a tumble. */}
+      {cupCovered ? (
+        <button
+          type="button"
+          onClick={openCup}
+          className="flex h-44 w-full flex-col items-center justify-center gap-3 rounded-2xl bg-white dark:bg-gray-800"
+          aria-label={t('game.openCup')}
+        >
+          <span className="text-5xl" aria-hidden>
+            🥤
+          </span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">{t('game.openCup')}</span>
+        </button>
+      ) : (
+        <div className="flex flex-shrink-0 flex-col items-center gap-2 rounded-2xl bg-white py-4 dark:bg-gray-800">
+          <DiceScene
+            diceCount={diceCount}
+            phase={dicePhase}
+            hand={hand}
+            onCollision={(force) => audio.collide('dice', force)}
+            onAllSettled={() => audio.settle()}
+          />
+          {summaryRows.length > 0 && state.phase !== 'reveal' && (
+            <div className="flex flex-wrap items-center justify-center gap-2 px-3 pb-1">
+              {summaryRows.map((row) => (
+                <span
+                  key={row}
+                  className="num rounded-lg bg-gray-100 px-2.5 py-1 text-base font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                >
+                  {row}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Own hand for screen readers — the dice card renders it visually. */}
       {hand && state.phase !== 'reveal' && (
@@ -771,10 +847,14 @@ function GameView({
         </p>
       )}
 
-      {state.phase === 'bidding' && !isMyTurn && (
-        <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-          {t('game.playerTurn', { name: state.players[state.currentTurnIdx]?.nick ?? '?' })}
-        </p>
+      {/* Not your turn — a stable waiting card, not a bare line, so the bid area
+          doesn't jarringly collapse to nothing after you bid (#10). */}
+      {state.phase === 'bidding' && !isMyTurn && amAlive && (
+        <div className="rounded-2xl bg-white py-4 text-center dark:bg-gray-800">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {t('game.playerTurn', { name: state.players[state.currentTurnIdx]?.nick ?? '?' })}
+          </p>
+        </div>
       )}
 
       {state.phase === 'reveal' && (
@@ -824,7 +904,7 @@ function GameView({
             <button
               type="button"
               onClick={leaveGame}
-              className="min-h-[44px] flex-1 rounded-2xl bg-white py-3 font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+              className="min-h-[44px] flex-1 rounded-2xl border border-gray-200 bg-white py-3 font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
             >
               {t('lobby.leaveRoom')}
             </button>
