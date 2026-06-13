@@ -35,8 +35,8 @@ test.describe('two-player full flow', () => {
     // tray renders >= 5 cubes for both. Language-agnostic class selectors.
     await openCup(alice);
     await openCup(bob);
-    await expect(alice.locator('.dice2d-root')).toBeVisible({ timeout: 15000 });
-    await expect(bob.locator('.dice2d-root')).toBeVisible({ timeout: 15000 });
+    await expect(alice.locator('.dice2d-tray')).toBeVisible({ timeout: 15000 });
+    await expect(bob.locator('.dice2d-tray')).toBeVisible({ timeout: 15000 });
     await expect
       .poll(() => alice.locator('.dice2d-cube').count(), { timeout: 15000 })
       .toBeGreaterThanOrEqual(5);

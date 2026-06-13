@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type DicePhase, DiceScene } from '@/components/dice/DiceScene';
+import { MyHand } from '@/components/dice/MyHand';
 import { BidChain } from '@/components/game/BidChain';
 import { BidPanel } from '@/components/game/BidPanel';
 import { PlayerRing } from '@/components/game/PlayerRing';
@@ -11,7 +11,6 @@ import { RevealStage } from '@/components/game/RevealStage';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
 import { ThemeModeToggle } from '@/components/theme/ThemeModeToggle';
 import { unlockAudio } from '@/lib/audio/howl-instance';
-import { useDiceAudio } from '@/lib/audio/useDiceAudio';
 import {
   advanceRound,
   applyBid,
@@ -23,7 +22,6 @@ import {
   isHumanTurn,
 } from '@/lib/bot/local-game';
 import type { BotDifficulty } from '@/lib/bot/policy';
-import { summarizeHand } from '@/lib/game/hand-summary';
 import { type Bid, DEFAULT_RULES, type GameRules } from '@/lib/game-engine/types';
 
 const DIFFICULTIES: BotDifficulty[] = ['easy', 'medium', 'hard'];
@@ -37,13 +35,10 @@ type BotNote = { kind: 'bid'; count: number; face: number } | { kind: 'challenge
 export function BotClient() {
   const t = useTranslations();
   const router = useRouter();
-  const audio = useDiceAudio();
 
   const [difficulty, setDifficulty] = useState<BotDifficulty>('medium');
   const [diceCount, setDiceCount] = useState<GameRules['diceCount']>(DEFAULT_RULES.diceCount);
   const [game, setGame] = useState<BotGame | null>(null);
-  const [diceHand, setDiceHand] = useState<number[] | null>(null);
-  const [dicePhase, setDicePhase] = useState<DicePhase>('settled');
   const [thinking, setThinking] = useState(false);
   const [note, setNote] = useState<BotNote>(null);
 
@@ -66,23 +61,6 @@ export function BotClient() {
       }),
     );
   }, [t, diceCount]);
-
-  // Re-tumble the player's own dice ONLY at the start of each round (null→hand
-  // flash, same pattern as room/solo so an identical hand still animates). The
-  // round is the intentional trigger; the hand is read via ref so a same-round
-  // bid doesn't re-roll the dice.
-  const round = game?.state.round;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `round` is the trigger; hand read via ref on purpose
-  useEffect(() => {
-    if (!gameRef.current) return;
-    setDiceHand(null);
-    setDicePhase('rolling');
-    const id = setTimeout(() => {
-      setDiceHand(gameRef.current?.hands[HUMAN_ID] ?? null);
-      setDicePhase('settled');
-    }, 60);
-    return () => clearTimeout(id);
-  }, [round]);
 
   // Drive the bot: whenever it's a bot's turn during bidding, think then act once.
   useEffect(() => {
@@ -190,8 +168,6 @@ export function BotClient() {
 
   const state = game.state;
   const alivePlayers = state.players.filter((p) => p.alive).length;
-  const human = state.players.find((p) => p.id === HUMAN_ID);
-  const summaryRows = diceHand && diceHand.length > 0 ? summarizeHand(diceHand) : [];
   const noteText =
     note?.kind === 'bid'
       ? t('bot.cpuBid', { count: note.count, face: note.face })
@@ -225,28 +201,11 @@ export function BotClient() {
 
         {state.phase === 'bidding' && <BidChain state={state} />}
 
-        {/* The human's own dice. */}
-        <div className="flex flex-shrink-0 flex-col items-center gap-2 rounded-2xl bg-white py-4 dark:bg-gray-800">
-          <DiceScene
-            diceCount={human?.diceLeft ?? state.rules.diceCount}
-            phase={dicePhase}
-            hand={diceHand}
-            onCollision={(force) => audio.collide('dice', force)}
-            onAllSettled={() => audio.settle()}
-          />
-          {summaryRows.length > 0 && state.phase !== 'reveal' && (
-            <div className="flex flex-wrap items-center justify-center gap-2 px-3 pb-1">
-              {summaryRows.map((row) => (
-                <span
-                  key={row}
-                  className="num rounded-lg bg-gray-100 px-2.5 py-1 text-base font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200"
-                >
-                  {row}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* The human's own dice — covered each round, tap / shake to throw + reveal
+            (#8 ritual via MyHand). On reveal the hand shows in RevealStage instead. */}
+        {state.phase === 'bidding' && (
+          <MyHand hand={game.hands[HUMAN_ID] ?? null} round={state.round} />
+        )}
 
         {state.phase === 'bidding' && isHumanTurn(game) && (
           <BidPanel

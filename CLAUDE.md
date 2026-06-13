@@ -16,7 +16,7 @@
 2. **`vercel.json` MUST set `framework: "nextjs"` explicitly.** Without it, Vercel auto-detection silently picks `@vercel/static-build` for Next 16, producing builds with **zero server functions**. Symptom: every app route 404s (incl. `/`, `/api/*`), but `/public/` static assets serve fine. The deploy still shows "Ready" — the bug is invisible until you actually hit the URL. See [[feedback_vercel_nextjs_framework_detection]].
 3. **Next.js 16 calls it `proxy`, not `middleware`.** File is `proxy.ts` at repo root, export name MUST be `function proxy(req: NextRequest)`. If you write `middleware`, build fails.
 4. **Lua scripts are JS template strings** in `lib/lua/scripts.ts`, NOT `.lua` files. They are now **atomic mutations + thin version-CAS commits only**: `joinRoom` / `startGame` / `placeBid` / `setAvatar` / `leaveRoom` / `rematch` / `commitState` / `commitRound`. Challenge/劈/通杀/nextRound resolution is computed in Node (see Game engine), NOT in Lua. `runScript` in `lib/lua/run.ts` calls `redis.eval`. ⚠ **Redis cjson.encode returns `nil` (not a string) for a table with a SHARED sub-table reference** → always build separate table literals (this silently broke every bid once).
-5. **Dice rolls must be server-side** (`lib/room/dice-rng.ts` uses `crypto.randomInt`). Client UI is decorative — the 3D cube dice (`components/dice/Dice2D`) tumble then settle on the fetched hand, but the authoritative hand is what the server stores in `room:{code}:hands`.
+5. **Dice rolls must be server-side** (`lib/room/dice-rng.ts` uses `crypto.randomInt`). Client UI is decorative — the 3D cube dice (`components/dice/MyHand` + `DiceCube`) tumble then settle on the fetched hand when the player taps/shakes to reveal, but the authoritative hand is what the server stores in `room:{code}:hands`.
 6. **Single design language (2026-06-12 redesign, matches the wxapp sibling)**: neutral Tailwind grays + red-600 accent + amber secondary, dark/light dual mode. `components/theme/ThemeProvider.tsx` = mode context (auto/light/dark, `localStorage['theme-mode']`, `dark` class on `<html>`); pre-paint inline script in `app/layout.tsx` prevents flash. NO per-theme tokens (tokens.ts deleted); style with Tailwind classes + `dark:` variants only.
 7. **Anti-AI-slop applies** (from `~/.claude/CLAUDE.md` design rules): no Lucide / `100vh` / centered hero grids; `min-h-[100dvh]`. Typography is intentionally the system sans stack (wxapp parity — the 4 display fonts were removed 2026-06-12). **Contrast floor**: axe wcag2aa runs in e2e — muted text ≥ gray-500 on light bg, white-on-color buttons need the 600-step shade (red-600 / emerald-700).
 
@@ -28,20 +28,20 @@
 | Deploy | Vercel Fluid Compute (maxDuration 300s Hobby / 800s Pro for SSE) |
 | State | Upstash Redis (HTTP client + Lua eval for CAS) |
 | Pub/Sub | Upstash REST `/subscribe/{channel}` SSE pipe |
-| Dice | CSS **3D cube** renderer (`components/dice/Dice2D` + `dice2d.css`) — perspective + preserve-3d, 6 pip faces, transition-driven spin+land (no keyframe snap); shared `PipDie` SVG for the inline dice in reveal/bid/chain (replaced the old emoji glyphs). White die + gray-900 pips both modes, no WebGL/Three.js |
+| Dice | CSS **3D cube** dice (`dice2d.css`) — perspective + preserve-3d, 6 pip faces, transition-driven spin+land (no keyframe snap). `components/dice/DiceCube` = dumb per-die cube (explicit rot/blank/flip); `components/dice/MyHand` = the player's own hand + the unified **tap/shake gesture** (deal→covered→tap/gyro→tumble+reveal once→tap→cover→re-peek flip), used identically in solo/bot/room (ported from the wxapp `DiceRow`). Shared `PipDie` SVG for the inline dice in reveal/bid/chain. White die + gray-900 pips both modes, no WebGL/Three.js |
 | Audio | `howler` v2 — settle = real CC0 sample (Kenney dice-throw-1, always on); other 7 slots = ffmpeg-synth sprites behind `NEXT_PUBLIC_AUDIO_ENABLED` (default off; only the `modern` pack is wired since the 4-theme removal) |
 | i18n | `next-intl` (zh-CN default + en, parity-checked). Default is zh-CN (no Accept-Language auto-switch); English is opt-in via the LanguageToggle (`components/i18n/LanguageToggle.tsx` → `setLocale` server action sets the `locale` cookie). |
 | UI | Tailwind v4 + React local state (no external state lib) |
 | Validation | Zod at API boundaries (`lib/validation/schemas.ts`) + Redis INCR rate limiter (`lib/rate-limit.ts`; 30/min action · 15/min room · 20/min session, all per-IP/session; `RATE_LIMIT_DISABLED=1` opt-out for e2e only) |
 | Lint | Biome v2 (replaces ESLint + Prettier; CSS formatter disabled — Tailwind v4 syntax incompatible) |
-| Test | Vitest (102 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / full-game-to-rematch / solo / **bot** / 劈 / palifico / axe a11y; 34 tests, chromium + webkit) |
+| Test | Vitest (106 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / full-game-to-rematch / solo / **bot** / 劈 / palifico / axe a11y; 34 tests, chromium + webkit) |
 
 ## Commands
 
 ```bash
 pnpm dev            # http://localhost:3000
 pnpm build          # production build (~1.5-2s)
-pnpm test           # 102 unit + integration tests
+pnpm test           # 106 unit + integration tests
 pnpm e2e            # Playwright e2e (auto-starts a dev server); browsers: playwright install chromium webkit
 PLAYWRIGHT_PORT=3100 pnpm e2e   # use when :3000 is taken by another project's dev server (reuseExistingServer would grab it)
 pnpm lint:fix       # Biome autofix
@@ -98,23 +98,23 @@ Pure, unit-tested functions in `lib/game-engine/`:
 
 Pinned 中式扩展 / Palifico semantics: see design spec §10/§10B. `lib/room/resolution.ts` = `readHands` (tolerant parse) + `normalizeState` (coerce cjson-`{}` arrays) + `GAME_TTL`. Boundary validation via Zod (`lib/validation/schemas.ts`); rate limit via `lib/rate-limit.ts` (30/min action, 15/min room).
 
-All unit-tested (102 unit + integration, full game simulated end-to-end via `round.ts`). Live path covered by Playwright e2e incl. 通杀 + player-2 counter-bid + full-game-to-rematch journeys. ⚠ **The opening-bid floor MUST be clamped to total table dice** (`getStartingBidThreshold(..., totalDice)`) — an unclamped floor (e.g. 1v1 with 1 die each: floor 3 > table 2) leaves the round opener with zero legal actions and softlocks the game.
+All unit-tested (106 unit + integration, full game simulated end-to-end via `round.ts`). Live path covered by Playwright e2e incl. 通杀 + player-2 counter-bid + full-game-to-rematch journeys. ⚠ **The opening-bid floor MUST be clamped to total table dice** (`getStartingBidThreshold(..., totalDice)`) — an unclamped floor (e.g. 1v1 with 1 die each: floor 3 > table 2) leaves the round opener with zero legal actions and softlocks the game.
 
 ## File layout
 
 ```
 app/
 ├── api/              # Route Handlers (server-only)
-├── room/[code]/      # Lobby + game (RoomClient.tsx — turn banner / current-call hero / 开盅 cup ritual / waiting card)
+├── room/[code]/      # Lobby + game (RoomClient.tsx — turn banner / current-call hero / MyHand covered-cup / waiting card)
 ├── solo/             # Offline solo dice-cup (SoloClient.tsx — local rolls, no room/network)
 ├── bot/              # 人机模式 — local single-device game vs the bot (BotClient.tsx; reuses room components)
 └── layout.tsx        # system font stack + ThemeProvider + pre-paint dark-mode script + manifest
 components/
-├── dice/             # Dice2D (CSS 3D cube + roll) / PipDie (inline SVG die) / DiceScene (wrapper) / dice2d.css
+├── dice/             # DiceCube (dumb per-die 3D cube) / MyHand (own hand + tap/shake gesture, used in solo/bot/room) / PipDie (inline SVG die) / dice2d.css
 ├── game/             # BidPanel (prominent 斋 toggle) / PlayerRing / BidChain / RevealStage / AvatarBadge / useRoomEvents
 ├── theme/            # ThemeProvider (dark/light mode context) + ThemeModeToggle pill
 ├── customization/    # CustomizationDrawer (mode + language + dice count + rules toggles + 结算模式/endMode selector + N/K steppers) / AvatarPicker
-└── shake/            # useShakeDetector (DeviceMotion + iOS perm; auto-grants on Android)
+└── shake/            # useShakeDetector (DeviceMotion + iOS perm; auto-grants on Android; `enabled` gate → listen only while covered)
 lib/
 ├── auth/             # session.ts (generators + validator) + session-store.ts + membership.ts
 ├── game-engine/      # types / validate / round  (resolve/state-machine/extensions DELETED — see Game engine)
@@ -152,6 +152,13 @@ Remaining (need a human / physical device — can't be done from a dev session):
 Planned (2026-06-11 — research done, NOT started):
 
 2. **微信小程序版** — friends-only 体验版路线（零备案/审核/版号；个人主体 15 体验成员 + 15 项目成员/appid）。开在**新 sibling repo** `~/projects/side-projects/dahua-dice-wxapp/`（infra 与 web 版零重叠：Taro 4 = React 18、云开发 CloudBase、`db.watch` 实时同步替代 SSE、`lib/game-engine/` 原样移植进云函数）。完整调研与架构映射：`docs/research/2026-06-11-wechat-miniprogram-port.md`；通用 playbook：`~/.claude/references/wechat-miniprogram-friends-only.md`。CloudBase skill 已装（`.claude/skills/cloudbase` → `.agents/skills/cloudbase`，`Skill(cloudbase)` 调用）。⚠ 注册普通小程序 + 工具类目，勿注册小游戏账号；游戏内永远零真钱元素。
+
+Done (2026-06-13 — ported the wxapp dice-gesture model to web; branch `feat/port-wxapp-dice-gesture`, 107 unit + 34 e2e green):
+
+- **Unified tap/shake gesture** across solo/bot/room, mirroring the wxapp sibling's `DiceRow` (its commits cc5ef44→f96e91c→8f35c6a): each new hand sits **static + covered** (values hidden via uniform `COVERED_ROT` + `?` blank faces, NO auto-roll); tap or gyro-shake → **first reveal tumbles + plays the always-on CC0 throw cue + vibrates (once)**, a **re-peek after covering just quick-flips** (FLIP_MS, silent — `rolledOnceRef`), tap → cover. Reduced-motion = instant flip but keeps the sound/haptic.
+- **New decomposition mirrors wxapp**: `components/dice/DiceCube` (dumb per-die cube, rotation math moved out of the old `Dice2D`) + `components/dice/MyHand` (the gesture orchestrator). **Retired `Dice2D` + `DiceScene`** (deleted). `useShakeDetector` gained an `enabled` gate so the gyro listens only while covered (kills the reveal-vibration self-retrigger).
+- **Fixed three pre-existing web divergences** the port surfaced: solo's shake **re-rolled** the dice (now reveals); bot **auto-threw** every round (now covered → user-triggered, restoring 仪式感); the room cup couldn't re-cover (now full cover/re-peek cycle).
+- **Multipass review** (4-dim + adversarial verify, 10 findings fixed): SR-only hand announcer moved INSIDE MyHand + gated on `revealed` (the room's external `aria-live` leaked the covered hand to screen readers; now uniform across modes); solo re-roll one-frame reveal flash killed via `useLayoutEffect` reset; throw cue moved to tumble-START + kept under reduced motion (was at land + silent); dead `audio.shake`/`.dice2d-root` removed; 10 orphaned i18n keys deleted + a new `messages-parity` test guards zh/en drift; iOS hint shows tap-only until the gyro is actually armed (`canShake`).
 
 Done (2026-06-12 — player-feedback R3, 11-issue batch; branch `feat/player-feedback-2026-06-12`, 102 unit + 34 e2e green; full triage + decisions in `docs/plans/2026-06-12-player-feedback-r3.md`):
 

@@ -9,7 +9,7 @@ const HOLD_MS = 150; // peak must persist >= this long to commit
 
 export type Permission = 'unknown' | 'granted' | 'denied' | 'unsupported';
 
-export function useShakeDetector(onShake: (intensity: number) => void) {
+export function useShakeDetector(onShake: (intensity: number) => void, enabled = true) {
   const [permission, setPermission] = useState<Permission>('unknown');
   const onShakeRef = useRef(onShake);
   onShakeRef.current = onShake;
@@ -33,9 +33,11 @@ export function useShakeDetector(onShake: (intensity: number) => void) {
     if (typeof DM?.requestPermission !== 'function') setPermission('granted');
   }, []);
 
-  // Subscribe to DeviceMotion when granted
+  // Subscribe to DeviceMotion when granted AND enabled. The `enabled` gate lets a
+  // caller listen only while the dice are covered, so the vibration fired on reveal
+  // can't immediately re-trigger another reveal (wxapp useShake parity).
   useEffect(() => {
-    if (permission !== 'granted') return;
+    if (permission !== 'granted' || !enabled) return;
     const peak = { mag: 0, start: 0 };
 
     function handler(e: DeviceMotionEvent) {
@@ -60,7 +62,7 @@ export function useShakeDetector(onShake: (intensity: number) => void) {
 
     window.addEventListener('devicemotion', handler);
     return () => window.removeEventListener('devicemotion', handler);
-  }, [permission]);
+  }, [permission, enabled]);
 
   const requestPermission = async (): Promise<Permission> => {
     if (typeof window === 'undefined') return 'unsupported';
