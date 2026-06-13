@@ -53,3 +53,15 @@ export async function startGame(ownerPage: Page) {
   await expect(startBtn).toBeEnabled({ timeout: 15000 });
   await startBtn.click();
 }
+
+/**
+ * Open the dice cup (#8 roll ritual) so the dice render. Each round the dice
+ * start covered; tapping 开盅 reveals them. `click` auto-waits for the cup to
+ * appear (the game view just transitioned); tolerates the cup being absent.
+ */
+export async function openCup(page: Page) {
+  await page
+    .getByRole('button', { name: /开盅/ })
+    .click({ timeout: 15000 })
+    .catch(() => {});
+}
