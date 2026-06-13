@@ -226,19 +226,37 @@ export function BidPanel({
       </div>
 
       {rules.allowZhai && !palifico && (
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
-          <input
-            type="checkbox"
-            checked={isZhai}
-            disabled={face === 1}
-            onChange={(e) => setZhaiChecked(e.target.checked)}
-            className="h-4 w-4 accent-amber-600"
-          />
-          {t('game.zhaiCall')}
-          {face === 1 && (
-            <span className="text-gray-500 dark:text-gray-400">· {t('game.faceOneAutoZhai')}</span>
-          )}
-        </label>
+        // Prominent toggle (was an easy-to-miss 16px checkbox — #1: players didn't
+        // realize zhai bidding existed). Amber-filled when on.
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isZhai}
+          disabled={face === 1}
+          onClick={() => setZhaiChecked(!zhaiChecked)}
+          className={`flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border px-3 text-sm transition-colors disabled:opacity-70 ${
+            isZhai
+              ? 'border-amber-500 bg-amber-100 font-medium text-amber-900 dark:border-amber-500 dark:bg-amber-900 dark:text-amber-100'
+              : 'border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
+          }`}
+        >
+          <span className="flex items-center gap-1.5">
+            {t('game.zhaiCall')}
+            {face === 1 && (
+              <span className="text-xs opacity-80">· {t('game.faceOneAutoZhai')}</span>
+            )}
+          </span>
+          <span
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 text-xs ${
+              isZhai
+                ? 'border-amber-600 bg-amber-500 text-white'
+                : 'border-gray-300 dark:border-gray-500'
+            }`}
+            aria-hidden
+          >
+            {isZhai ? '✓' : ''}
+          </span>
+        </button>
       )}
 
       <div className="mt-2 flex gap-3">

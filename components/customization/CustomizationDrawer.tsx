@@ -4,7 +4,9 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
 import { type ThemeMode, useThemeMode } from '@/components/theme/ThemeProvider';
-import type { GameRules } from '@/lib/game-engine/types';
+import type { EndMode, GameRules } from '@/lib/game-engine/types';
+
+const END_MODES: EndMode[] = ['attrition', 'party', 'knockout', 'score'];
 
 const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -32,6 +34,9 @@ export function CustomizationDrawer({
   const [allowZhai, setAllowZhai] = useState(rules.allowZhai);
   const [chineseExt, setChineseExt] = useState(rules.chineseExtensions);
   const [palifico, setPalifico] = useState(rules.paliFicoVariant);
+  const [endMode, setEndMode] = useState<EndMode>(rules.endMode ?? 'attrition');
+  const [knockoutLosses, setKnockoutLosses] = useState(rules.knockoutLosses ?? 3);
+  const [scoreRounds, setScoreRounds] = useState(rules.scoreRounds ?? 5);
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
   const wasOpenRef = useRef(false);
@@ -50,6 +55,9 @@ export function CustomizationDrawer({
       setAllowZhai(rules.allowZhai);
       setChineseExt(rules.chineseExtensions);
       setPalifico(rules.paliFicoVariant);
+      setEndMode(rules.endMode ?? 'attrition');
+      setKnockoutLosses(rules.knockoutLosses ?? 3);
+      setScoreRounds(rules.scoreRounds ?? 5);
     }
     wasOpenRef.current = open;
   }, [open, rules]);
@@ -76,6 +84,9 @@ export function CustomizationDrawer({
       allowZhai,
       chineseExtensions: chineseExt,
       paliFicoVariant: palifico,
+      endMode,
+      knockoutLosses,
+      scoreRounds,
     });
     onClose();
   }
@@ -210,6 +221,55 @@ export function CustomizationDrawer({
               <Toggle label={t('customization.palifico')} value={palifico} onChange={setPalifico} />
             </section>
 
+            {/* Game-end mode (#2): how a loss is handled + how the game ends. */}
+            <section className="flex flex-col gap-2">
+              <h3 className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                {t('customization.endMode')}
+              </h3>
+              <div className="flex flex-col gap-2">
+                {END_MODES.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setEndMode(m)}
+                    aria-pressed={endMode === m}
+                    className={`rounded-xl px-3 py-2.5 text-left transition-colors ${
+                      endMode === m
+                        ? 'bg-red-600 text-white'
+                        : 'bg-white text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                    }`}
+                  >
+                    <span className="block text-sm font-medium">
+                      {t(`customization.endMode_${m}`)}
+                    </span>
+                    <span
+                      className={`block text-xs ${endMode === m ? 'text-red-50' : 'text-gray-500 dark:text-gray-400'}`}
+                    >
+                      {t(`customization.endMode_${m}_desc`)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {endMode === 'knockout' && (
+                <NumberStepper
+                  label={t('customization.knockoutLosses')}
+                  value={knockoutLosses}
+                  min={1}
+                  max={20}
+                  onChange={setKnockoutLosses}
+                />
+              )}
+              {endMode === 'score' && (
+                <NumberStepper
+                  label={t('customization.scoreRounds')}
+                  value={scoreRounds}
+                  min={1}
+                  max={50}
+                  onChange={setScoreRounds}
+                />
+              )}
+            </section>
+
             <button
               type="button"
               onClick={handleSave}
@@ -225,6 +285,47 @@ export function CustomizationDrawer({
             {t('customization.onlyOwnerCanEdit')}
           </p>
         )}
+      </div>
+    </div>
+  );
+}
+
+function NumberStepper({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="flex min-h-[44px] items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 dark:bg-gray-800">
+      <span className="text-sm">{label}</span>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(min, value - 1))}
+          disabled={value <= min}
+          aria-label={`${label} −`}
+          className="h-9 w-9 rounded-full bg-gray-100 text-lg font-medium text-gray-900 disabled:opacity-30 dark:bg-gray-700 dark:text-gray-100"
+        >
+          −
+        </button>
+        <span className="num min-w-[2ch] text-center text-lg font-bold">{value}</span>
+        <button
+          type="button"
+          onClick={() => onChange(Math.min(max, value + 1))}
+          disabled={value >= max}
+          aria-label={`${label} +`}
+          className="h-9 w-9 rounded-full bg-gray-100 text-lg font-medium text-gray-900 disabled:opacity-30 dark:bg-gray-700 dark:text-gray-100"
+        >
+          +
+        </button>
       </div>
     </div>
   );
