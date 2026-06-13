@@ -63,9 +63,15 @@ export function isValidBid(
     return { ok: false, reason: 'break_zhai_needs_2x' };
   }
 
-  // Every other transition — same regime, OR entering zhai from 飞 (research §2.3
-  // 中途转斋 only requires 满足加叫规则, i.e. the normal raise rule) — uses the
-  // standard raise: count up, or same count + face up.
+  // 转斋 (entering zhai from 飞): 1s stop counting → the qualifying pool roughly
+  // halves, so the count may DROP to ceil(prev/2) and the face is then free.
+  // (AX 实牌规则 2026-06-12: 叫 4个4 可斋叫 3个5 —— 少叫；symmetric to 破斋 ×2.)
+  if (!prev.isZhai && next.isZhai) {
+    if (next.count >= Math.ceil(prev.count / 2)) return { ok: true };
+    return { ok: false, reason: 'zhai_below_half' };
+  }
+
+  // Same regime (both 飞 or both 斋): standard raise — count up, or same count + face up.
   if (next.count > prev.count) return { ok: true };
   if (next.count === prev.count && next.face > prev.face) return { ok: true };
   return { ok: false, reason: 'not_higher' };

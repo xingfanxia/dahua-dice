@@ -117,16 +117,27 @@ describe('isValidBid (zhai transitions)', () => {
     expect(isValidBid(prev, { count: 4, face: 4, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
   });
 
-  it('enters zhai (from 飞): follows the normal raise rule (research §2.3 转斋)', () => {
+  it('enters zhai (转斋 from 飞): count may halve to ceil(prev/2), face free (AX 实牌规则)', () => {
     const prev = { count: 6, face: 4, isZhai: false } as const;
     // count-up into zhai → ok
     expect(isValidBid(prev, { count: 7, face: 4, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
-    // same count + face-up into zhai → ok
-    expect(isValidBid(prev, { count: 6, face: 5, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
-    // same count + same face → not a raise → reject
-    expect(isValidBid(prev, { count: 6, face: 4, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(false);
-    // count-down into zhai → reject (no special halve-pool allowance)
-    expect(isValidBid(prev, { count: 4, face: 4, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(false);
+    // count down to ceil(6/2)=3, face自选 → ok（少叫；AX: 叫6个4 → 斋3个5）
+    expect(isValidBid(prev, { count: 3, face: 5, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
+    expect(isValidBid(prev, { count: 4, face: 2, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
+    // same count + same face into zhai = 去掉万能、更强的同数声明 → ok
+    expect(isValidBid(prev, { count: 6, face: 4, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
+    // below half (2 < 3) → reject
+    const r = isValidBid(prev, { count: 2, face: 4, isZhai: true }, DEFAULT_RULES, 4);
+    expect(r.ok).toBe(false);
+    expect(r.ok ? undefined : r.reason).toBe('zhai_below_half');
+  });
+
+  it('转斋 user example: 4个4 (飞) → 3个5 (斋) accepted', () => {
+    const prev = { count: 4, face: 4, isZhai: false } as const;
+    expect(isValidBid(prev, { count: 3, face: 5, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
+    // ceil(4/2)=2, so 2个 also ok, 1个 rejected
+    expect(isValidBid(prev, { count: 2, face: 6, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(true);
+    expect(isValidBid(prev, { count: 1, face: 6, isZhai: true }, DEFAULT_RULES, 4).ok).toBe(false);
   });
 
   it('rejects zhai when rules.allowZhai = false', () => {

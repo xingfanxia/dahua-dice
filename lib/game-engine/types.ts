@@ -17,6 +17,9 @@ export type GameRules = {
   diceSides: 6 | 8;
   chineseExtensions: { pi: boolean; fanpi: boolean; tongsha: boolean };
   paliFicoVariant: boolean;
+  // 失败减骰子（淘汰制）。false = 聚会版：输了不减骰、永不淘汰，每轮只决出输家（喝一杯）。
+  // 旧文档无此字段 → 解算时按 `=== false` 判定，缺省即淘汰制（向后兼容）。
+  loseDie: boolean;
 };
 
 export const DEFAULT_RULES: GameRules = {
@@ -27,6 +30,7 @@ export const DEFAULT_RULES: GameRules = {
   diceSides: 6,
   chineseExtensions: { pi: false, fanpi: false, tongsha: false },
   paliFicoVariant: false,
+  loseDie: true,
 };
 
 export type Player = {

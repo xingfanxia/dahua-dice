@@ -74,6 +74,12 @@ function prevAliveIdx(players: Player[], from: number): number {
   return from;
 }
 
+/** Dice actually removed for a loss. 0 in the no-elimination house rule (聚会版:
+ * 输了不减骰、永不淘汰，只决出本轮输家). `=== false` so old rooms w/o the field stay 淘汰制. */
+function lossFor(state: RoomState, n: number): number {
+  return state.rules.loseDie === false ? 0 : n;
+}
+
 /** Subtract `n` dice from the player at `idx`; mark them out at 0. Immutable. */
 function applyLoss(players: Player[], idx: number, n: number): Player[] {
   return players.map((p, i) => {
@@ -141,7 +147,7 @@ export function resolveChallenge(
   const bidderIdx =
     bidderId != null ? idxOf(state, bidderId) : prevAliveIdx(state.players, challengerIdx);
   const loserIdx = meets ? challengerIdx : bidderIdx;
-  const players = applyLoss(state.players, loserIdx, 1);
+  const players = applyLoss(state.players, loserIdx, lossFor(state, 1));
 
   return finalize(state, players, {
     kind: 'challenge',
@@ -194,7 +200,7 @@ export function resolvePi(
 
   const loserIdx = meets ? splitterIdx : targetIdx;
   const diceLost = meets && state.rules.chineseExtensions.fanpi ? 2 : 1;
-  const players = applyLoss(state.players, loserIdx, diceLost);
+  const players = applyLoss(state.players, loserIdx, lossFor(state, diceLost));
 
   return finalize(state, players, {
     kind: 'pi',
@@ -237,13 +243,13 @@ export function resolveTongsha(state: RoomState, hands: Hands, tongshaId: string
   let diceLost: number;
   if (!meets) {
     // Sweep: every other chain bidder loses a die.
-    for (const id of chainBidderIds) players = applyLoss(players, idxOf(state, id), 1);
+    for (const id of chainBidderIds) players = applyLoss(players, idxOf(state, id), lossFor(state, 1));
     loserIds = chainBidderIds;
     loserIdx = idxOf(state, chainBidderIds[0]);
     diceLost = 1;
   } else {
     // Backfire: the 通杀er loses 2 dice.
-    players = applyLoss(players, tIdx, 2);
+    players = applyLoss(players, tIdx, lossFor(state, 2));
     loserIds = [tongshaId];
     loserIdx = tIdx;
     diceLost = 2;

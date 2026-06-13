@@ -349,3 +349,32 @@ describe('prepareNextRound + Palifico', () => {
     expect(r.state?.currentTurnIdx).toBe(0); // loser (p1) opens
   });
 });
+
+describe('loseDie house rule (聚会版: 输了不减骰、不淘汰)', () => {
+  it('challenge with loseDie=false → loser keeps all dice, game never ends', () => {
+    const s = makeState({
+      players: [
+        { id: 'p1', nick: 'A', avatar: 'numeric', diceLeft: 1, alive: true },
+        { id: 'p2', nick: 'B', avatar: 'numeric', diceLeft: 1, alive: true },
+      ],
+      currentTurnIdx: 1,
+      lastBid: { count: 6, face: 4, isZhai: false },
+      bidChain: [{ playerId: 'p1', bid: { count: 6, face: 4, isZhai: false } }],
+      rules: { ...DEFAULT_RULES, loseDie: false },
+    });
+    const r = resolveChallenge(s, { p1: [3], p2: [3] }, 'p2'); // actual 0 < 6 → p1 loses
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.outcome.loserId).toBe('p1');
+    expect(r.state.players[0].diceLeft).toBe(1); // 不减骰
+    expect(r.state.players[0].alive).toBe(true);
+    expect(r.outcome.gameEnded).toBe(false); // 即使剩 1 颗也不淘汰、不终局
+  });
+
+  it('default (loseDie omitted) still removes a die (淘汰制向后兼容)', () => {
+    const r = resolveChallenge(makeState(), HANDS, 'p3');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.players[1].diceLeft).toBe(4); // 减一颗
+  });
+})
