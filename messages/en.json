@@ -25,7 +25,8 @@
     "nicknameRequired": "Please enter a nickname",
     "nicknameTooLong": "Nickname up to 20 chars",
     "invalidCode": "Invite code must be 6 chars",
-    "soloMode": "Solo / offline mode"
+    "soloMode": "Solo / offline",
+    "botMode": "vs Computer"
   },
   "lobby": {
     "title": "Room {code}",
@@ -186,5 +187,20 @@
     "shakeHint": "Shake the phone to roll",
     "enableShake": "Enable shake-to-roll",
     "yourDice": "Your dice"
+  },
+  "bot": {
+    "title": "vs Computer",
+    "subtitle": "Play a round against the computer · all on-device, offline",
+    "difficulty": "Difficulty",
+    "easy": "Easy",
+    "medium": "Medium",
+    "hard": "Hard",
+    "start": "Start game",
+    "you": "You",
+    "cpu": "CPU",
+    "thinking": "CPU is thinking…",
+    "cpuBid": "CPU bids {count} × {face}",
+    "cpuChallenge": "CPU calls!",
+    "rematch": "Play again"
   }
 }

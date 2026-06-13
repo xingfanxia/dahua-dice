@@ -25,7 +25,8 @@
     "nicknameRequired": "请输入昵称",
     "nicknameTooLong": "昵称最多 20 字",
     "invalidCode": "邀请码必须 6 位",
-    "soloMode": "线下 / 单人模式"
+    "soloMode": "线下 / 单人",
+    "botMode": "人机模式"
   },
   "lobby": {
     "title": "房间 {code}",
@@ -186,5 +187,20 @@
     "shakeHint": "摇一摇手机也能扔",
     "enableShake": "启用摇一摇",
     "yourDice": "你的骰子"
+  },
+  "bot": {
+    "title": "人机对战",
+    "subtitle": "和电脑玩一局大话骰 · 全程在本机，不联网",
+    "difficulty": "难度",
+    "easy": "简单",
+    "medium": "中等",
+    "hard": "困难",
+    "start": "开始对战",
+    "you": "你",
+    "cpu": "电脑",
+    "thinking": "电脑思考中…",
+    "cpuBid": "电脑叫 {count} 个 {face}",
+    "cpuChallenge": "电脑开！",
+    "rematch": "再来一局"
   }
 }
