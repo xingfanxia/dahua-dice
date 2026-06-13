@@ -150,7 +150,18 @@ export function Dice2D({
       setDisplayFaces(target);
       return;
     }
-    if (seenRollKey.current === rollKey) return;
+    if (seenRollKey.current === rollKey) {
+      // Already animated this exact roll — snap to rest before bailing. A prior
+      // render in the same round-advance (the transient hand=null between rounds)
+      // can start a tumble whose settle timers this effect's cleanup then clears
+      // before they fire; without resetting here the dice would spin forever when
+      // round 2 happens to deal the same faces as round 1 (issue #3 freeze). Every
+      // early-return path must leave tumbling cleared.
+      setTumbling(target.map(() => false));
+      setPopping(target.map(() => false));
+      setDisplayFaces(target);
+      return;
+    }
     // Mark this rollKey "consumed" only on completion (reduced-motion branch and
     // the settle branch below), NOT here. Under React Strict Mode the effect runs
     // mount → cleanup → mount; setting it up front would let the cleaned-up first
