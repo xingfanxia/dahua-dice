@@ -208,6 +208,7 @@
     "title": "人机对战",
     "subtitle": "和电脑玩一局大话骰 · 全程在本机，不联网",
     "difficulty": "难度",
+    "diceCount": "骰子数量",
     "easy": "简单",
     "medium": "中等",
     "hard": "困难",

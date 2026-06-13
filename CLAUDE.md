@@ -55,7 +55,7 @@ vercel --prod --scope panpanmao   # deploy
 |---|---|---|
 | GET | `/` | Home — nickname + 创建/加入 + 线下/单人模式 entry |
 | GET | `/solo` | Offline / solo dice-cup — local `crypto` rolls, no room/network (`app/solo/SoloClient.tsx`) |
-| GET | `/bot` | 人机模式 — LOCAL single-device game vs a probability-model bot, no room/server (`app/bot/BotClient.tsx`, engine reused via `lib/bot/`) |
+| GET | `/bot` | 人机模式 — LOCAL single-device game vs a probability-model bot, no room/server (`app/bot/BotClient.tsx`, engine reused via `lib/bot/`). Setup screen picks 难度 + **骰子数量 (3–10, GameRules range)** → `createBotGame({ rules })` |
 | GET | `/room/[code]` | Room (lobby + game, phase-driven) |
 | POST | `/api/room` | Create room → return code + token |
 | GET | `/api/room/[code]` | Public room info (phase, playerCount, joinable) |

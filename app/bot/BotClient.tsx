@@ -24,9 +24,12 @@ import {
 } from '@/lib/bot/local-game';
 import type { BotDifficulty } from '@/lib/bot/policy';
 import { summarizeHand } from '@/lib/game/hand-summary';
-import type { Bid } from '@/lib/game-engine/types';
+import { type Bid, DEFAULT_RULES, type GameRules } from '@/lib/game-engine/types';
 
 const DIFFICULTIES: BotDifficulty[] = ['easy', 'medium', 'hard'];
+// 3-10 = the GameRules.diceCount type range (the bot runs the real engine, so it
+// must stay in that range — unlike /solo's 1-10, which bypasses GameRules).
+const DICE_COUNTS: GameRules['diceCount'][] = [3, 4, 5, 6, 7, 8, 9, 10];
 const BOT_THINK_MS = 950; // readable pause before the bot's move
 
 type BotNote = { kind: 'bid'; count: number; face: number } | { kind: 'challenge' } | null;
@@ -37,6 +40,7 @@ export function BotClient() {
   const audio = useDiceAudio();
 
   const [difficulty, setDifficulty] = useState<BotDifficulty>('medium');
+  const [diceCount, setDiceCount] = useState<GameRules['diceCount']>(DEFAULT_RULES.diceCount);
   const [game, setGame] = useState<BotGame | null>(null);
   const [diceHand, setDiceHand] = useState<number[] | null>(null);
   const [dicePhase, setDicePhase] = useState<DicePhase>('settled');
@@ -58,9 +62,10 @@ export function BotClient() {
         humanAvatar: 'numeric',
         botNick: t('bot.cpu'),
         botAvatar: 'numeric',
+        rules: { ...DEFAULT_RULES, diceCount },
       }),
     );
-  }, [t]);
+  }, [t, diceCount]);
 
   // Re-tumble the player's own dice ONLY at the start of each round (null→hand
   // flash, same pattern as room/solo so an identical hand still animates). The
@@ -146,6 +151,28 @@ export function BotClient() {
                 }`}
               >
                 {t(`bot.${d}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col gap-2.5 rounded-2xl bg-white p-4 dark:bg-gray-800">
+          <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            {t('bot.diceCount')}
+          </span>
+          <div className="grid grid-cols-4 gap-2">
+            {DICE_COUNTS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setDiceCount(n)}
+                aria-pressed={diceCount === n}
+                className={`num min-h-[44px] rounded-xl text-base transition-colors ${
+                  diceCount === n
+                    ? 'bg-red-600 font-medium text-white'
+                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                }`}
+              >
+                {n}
               </button>
             ))}
           </div>

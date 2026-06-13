@@ -10,6 +10,7 @@ import {
   HUMAN_ID,
   isHumanTurn,
 } from '@/lib/bot/local-game';
+import { DEFAULT_RULES } from '@/lib/game-engine/types';
 
 function freshGame(): BotGame {
   return createBotGame({
@@ -28,6 +29,20 @@ describe('local bot game', () => {
     expect(g.hands[BOT_ID]).toHaveLength(5);
     expect(isHumanTurn(g)).toBe(true);
     expect(g.state.phase).toBe('bidding');
+  });
+
+  it('honors a configured diceCount for both players (setup-screen picker)', () => {
+    const g = createBotGame({
+      humanNick: 'You',
+      humanAvatar: 'numeric',
+      botNick: 'CPU',
+      botAvatar: 'numeric',
+      rules: { ...DEFAULT_RULES, diceCount: 7 },
+    });
+    expect(g.state.rules.diceCount).toBe(7);
+    expect(g.state.players.every((p) => p.diceLeft === 7)).toBe(true);
+    expect(g.hands[HUMAN_ID]).toHaveLength(7);
+    expect(g.hands[BOT_ID]).toHaveLength(7);
   });
 
   it('human bid advances to the bot, and a bot step produces a legal action', () => {
