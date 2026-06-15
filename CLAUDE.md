@@ -34,14 +34,14 @@
 | UI | Tailwind v4 + React local state (no external state lib) |
 | Validation | Zod at API boundaries (`lib/validation/schemas.ts`) + Redis INCR rate limiter (`lib/rate-limit.ts`; 30/min action · 15/min room · 20/min session, all per-IP/session; `RATE_LIMIT_DISABLED=1` opt-out for e2e only) |
 | Lint | Biome v2 (replaces ESLint + Prettier; CSS formatter disabled — Tailwind v4 syntax incompatible) |
-| Test | Vitest (106 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / full-game-to-rematch / solo / **bot** / 劈 / palifico / axe a11y; 34 tests, chromium + webkit) |
+| Test | Vitest (120 unit/integration) + Playwright e2e (happy-path / reconnect / extensions / player2-flow / full-game-to-rematch / solo / **bot** + party-mode / 劈 / palifico / axe a11y incl. **rules-sheet + bot-setup**; 40 tests, chromium + webkit) |
 
 ## Commands
 
 ```bash
 pnpm dev            # http://localhost:3000
 pnpm build          # production build (~1.5-2s)
-pnpm test           # 106 unit + integration tests
+pnpm test           # 120 unit + integration tests
 pnpm e2e            # Playwright e2e (auto-starts a dev server); browsers: playwright install chromium webkit
 PLAYWRIGHT_PORT=3100 pnpm e2e   # use when :3000 is taken by another project's dev server (reuseExistingServer would grab it)
 pnpm lint:fix       # Biome autofix
@@ -55,7 +55,7 @@ vercel --prod --scope panpanmao   # deploy
 |---|---|---|
 | GET | `/` | Home — nickname + 创建/加入 + 线下/单人模式 entry |
 | GET | `/solo` | Offline / solo dice-cup — local `crypto` rolls, no room/network (`app/solo/SoloClient.tsx`) |
-| GET | `/bot` | 人机模式 — LOCAL single-device game vs a probability-model bot, no room/server (`app/bot/BotClient.tsx`, engine reused via `lib/bot/`). Setup screen picks 难度 + **骰子数量 (3–10, GameRules range)** → `createBotGame({ rules })` |
+| GET | `/bot` | 人机模式 — LOCAL single-device game vs a probability-model bot, no room/server (`app/bot/BotClient.tsx`, engine reused via `lib/bot/`). Setup screen picks 难度 + **骰子数量 (3–10)** + **结算方式/endMode (4 modes + N/K steppers, reuses CustomizationDrawer's `END_MODES`/`NumberStepper`)** → `createBotGame({ rules })`. Party mode never auto-ends → a **结束本场** exit returns to setup |
 | GET | `/room/[code]` | Room (lobby + game, phase-driven) |
 | POST | `/api/room` | Create room → return code + token |
 | GET | `/api/room/[code]` | Public room info (phase, playerCount, joinable) |
@@ -98,7 +98,7 @@ Pure, unit-tested functions in `lib/game-engine/`:
 
 Pinned 中式扩展 / Palifico semantics: see design spec §10/§10B. `lib/room/resolution.ts` = `readHands` (tolerant parse) + `normalizeState` (coerce cjson-`{}` arrays) + `GAME_TTL`. Boundary validation via Zod (`lib/validation/schemas.ts`); rate limit via `lib/rate-limit.ts` (30/min action, 15/min room).
 
-All unit-tested (106 unit + integration, full game simulated end-to-end via `round.ts`). Live path covered by Playwright e2e incl. 通杀 + player-2 counter-bid + full-game-to-rematch journeys. ⚠ **The opening-bid floor MUST be clamped to total table dice** (`getStartingBidThreshold(..., totalDice)`) — an unclamped floor (e.g. 1v1 with 1 die each: floor 3 > table 2) leaves the round opener with zero legal actions and softlocks the game.
+All unit-tested (120 unit + integration, full game simulated end-to-end via `round.ts`). Live path covered by Playwright e2e incl. 通杀 + player-2 counter-bid + full-game-to-rematch journeys. ⚠ **The opening-bid floor MUST be clamped to total table dice** (`getStartingBidThreshold(..., totalDice)`) — an unclamped floor (e.g. 1v1 with 1 die each: floor 3 > table 2) leaves the round opener with zero legal actions and softlocks the game.
 
 ## File layout
 
@@ -111,7 +111,7 @@ app/
 └── layout.tsx        # system font stack + ThemeProvider + pre-paint dark-mode script + manifest
 components/
 ├── dice/             # DiceCube (dumb per-die 3D cube) / MyHand (own hand + tap/shake gesture, used in solo/bot/room) / PipDie (inline SVG die) / dice2d.css
-├── game/             # BidPanel (prominent 斋 toggle) / PlayerRing / BidChain / RevealStage / AvatarBadge / useRoomEvents
+├── game/             # BidPanel (斋 toggle + per-button hints) / PlayerRing / BidChain / RevealStage (4-section causal reveal: bid · hands+subtotals · verdict ≥/＜ · ruling by endMode) / RulesSheet (home 怎么玩 bottom-sheet) / OnboardHint (dismissible on-turn how-to, localStorage) / BetInterpretation (「X 赌全场至少有 N 个 Y 点」reading) / AvatarBadge / useRoomEvents
 ├── theme/            # ThemeProvider (dark/light mode context) + ThemeModeToggle pill
 ├── customization/    # CustomizationDrawer (mode + language + dice count + rules toggles + 结算模式/endMode selector + N/K steppers) / AvatarPicker
 └── shake/            # useShakeDetector (DeviceMotion + iOS perm; auto-grants on Android; `enabled` gate → listen only while covered)
@@ -152,6 +152,13 @@ Remaining (need a human / physical device — can't be done from a dev session):
 Planned (2026-06-11 — research done, NOT started):
 
 2. **微信小程序版** — friends-only 体验版路线（零备案/审核/版号；个人主体 15 体验成员 + 15 项目成员/appid）。开在**新 sibling repo** `~/projects/side-projects/dahua-dice-wxapp/`（infra 与 web 版零重叠：Taro 4 = React 18、云开发 CloudBase、`db.watch` 实时同步替代 SSE、`lib/game-engine/` 原样移植进云函数）。完整调研与架构映射：`docs/research/2026-06-11-wechat-miniprogram-port.md`；通用 playbook：`~/.claude/references/wechat-miniprogram-friends-only.md`。CloudBase skill 已装（`.claude/skills/cloudbase` → `.agents/skills/cloudbase`，`Skill(cloudbase)` 调用）。⚠ 注册普通小程序 + 工具类目，勿注册小游戏账号；游戏内永远零真钱元素。
+
+Done (2026-06-14 — ported the wxapp UX-clarity batch to web; branch `feat/port-wxapp-ux-clarity`, 120 unit + 40 e2e green; wxapp commits 08c6ff1 / 6e09f3b / 8f473b6):
+
+- **UX-1 reveal clarity** (`RevealStage` rewrite): the old screen only showed「叫 N×face · 实际 M」and players misread a correct result as a bug. Now 4 causal sections — ① the opened bid (who 叫 N×点 + 斋) + who 开/劈/通杀, ② every hand with **real-match (emerald ring) vs wild-1·飞 (amber ring)** highlights + dimmed misses + a per-player subtotal, ③ a verdict bar (`全场 total ≥/＜ 叫的 count → ✓成立/✗虚张`, with the 真+飞 split or 斋 note), ④ the ruling (who loses & why) branching **💀减骰 (attrition) / 🍺喝一杯 (party) / 📉记一负 (knockout·score)**. All from the engine's authoritative `ChallengeOutcome` fields; the actor-attribution trick (recover the opener from `loserId` only when the bid stands) ported verbatim. `PipDie` gained `tone`/`dimmed`. **10 orphaned reveal-result i18n keys deleted** (`bidLabel`/`actualLabel`/`kindChallenge`/`kindPi`/`kindTongsha`/`lostDie`/`lostNDice`/`actualResult`/`withWildOnes`/`loserLostDie`).
+- **UX-2 bot settlement modes** (`/bot`): the engine already supported all 4 endModes and the bot already enumerates 斋 candidates, so this was a UI-only gap — added the **结算方式 selector + N/K steppers** (reusing the drawer's exported `END_MODES`/`NumberStepper`, single label source) + the mandatory **结束本场** exit (party never auto-ends, else the reveal loops forever). `policy.ts` left untouched (already superior to the wxapp's hand-written zhai candidate list).
+- **UX-3/4 guidance**: new `RulesSheet` (home 怎么玩 bottom-sheet, focus-trapped, reuses `customization.endMode_*` copy), `OnboardHint` (dismissible on-turn how-to, SSR-safe localStorage), `BetInterpretation` (「{bidder} 赌全场至少有 N 个 Y 点」under the standing call in room+bot), BidPanel per-button hints, home 三种玩法 guide bar + reworded subtitle. Deliberately did **not** duplicate the web's existing turn banner / current-call hero.
+- **Multipass review** (5-dim + per-finding adversarial verify, ~15 agents) found & fixed 5: knockout/score wrongly showed 🍺「喝一杯」(→ split to 📉「记一负」); bot endMode inactive-desc + RevealStage `bidderCalled` label failed axe 4.5:1 (darkened a step); RulesSheet claimed `aria-modal` without focus management (added trap); + a new `/bot` axe scan closed the gap that let the contrast miss ship.
 
 Done (2026-06-13 — ported the wxapp dice-gesture model to web; branch `feat/port-wxapp-dice-gesture`, 107 unit + 34 e2e green):
 

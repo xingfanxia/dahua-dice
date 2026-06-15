@@ -122,10 +122,11 @@ test.describe('劈 (Pi, live)', () => {
     await expect(picker).toBeVisible({ timeout: 10_000 });
     await picker.getByRole('button').first().click();
 
-    // 劈 resolves straight to the reveal on every screen, labelled kind 劈! (game.kindPi).
+    // 劈 resolves straight to the reveal on every screen; the reveal hero/ruling name
+    // the 劈 action (game.reveal.split / .rulingPi*), so "劈" appears in the result.
     for (const p of order) {
       await expect(p.getByRole('heading', { name: '揭晓!' })).toBeVisible({ timeout: 15_000 });
     }
-    await expect(splitterPage.getByText('劈!')).toBeVisible({ timeout: 10_000 });
+    await expect(splitterPage.getByText(/劈/).first()).toBeVisible({ timeout: 10_000 });
   });
 });

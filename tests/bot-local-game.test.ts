@@ -73,6 +73,59 @@ describe('local bot game', () => {
     }
   });
 
+  it('flows endMode + N/K rules from the setup screen into the game state', () => {
+    const ko = createBotGame({
+      humanNick: 'You',
+      humanAvatar: 'numeric',
+      botNick: 'CPU',
+      botAvatar: 'numeric',
+      rules: { ...DEFAULT_RULES, endMode: 'knockout', knockoutLosses: 2 },
+    });
+    expect(ko.state.rules.endMode).toBe('knockout');
+    expect(ko.state.rules.knockoutLosses).toBe(2);
+    const sc = createBotGame({
+      humanNick: 'You',
+      humanAvatar: 'numeric',
+      botNick: 'CPU',
+      botAvatar: 'numeric',
+      rules: { ...DEFAULT_RULES, endMode: 'score', scoreRounds: 7 },
+    });
+    expect(sc.state.rules.endMode).toBe('score');
+    expect(sc.state.rules.scoreRounds).toBe(7);
+  });
+
+  it('party mode never ends and never removes dice (so the 结束本场 exit is mandatory)', () => {
+    let g = createBotGame({
+      humanNick: 'You',
+      humanAvatar: 'numeric',
+      botNick: 'CPU',
+      botAvatar: 'numeric',
+      rules: { ...DEFAULT_RULES, endMode: 'party' },
+    });
+    const startDice = g.state.players.map((p) => p.diceLeft);
+    for (let round = 0; round < 40; round++) {
+      // Drive one round to a reveal: bot raises (rng high → no early bluff), human
+      // opens then challenges so the round always resolves.
+      let guard = 0;
+      while (g.state.phase === 'bidding' && guard++ < 30) {
+        if (isHumanTurn(g)) {
+          g = g.state.lastBid
+            ? applyChallenge(g, HUMAN_ID)
+            : applyBid(g, HUMAN_ID, { count: 1, face: 4, isZhai: false });
+        } else {
+          g = botStep(g, 'medium', () => 0.99).game;
+        }
+      }
+      expect(g.state.phase).toBe('reveal');
+      // party never auto-ends, and the loss consequence keeps every die.
+      expect(g.state.lastChallengeResult?.gameEnded).toBe(false);
+      expect(g.state.players.map((p) => p.diceLeft)).toEqual(startDice);
+      expect(g.state.players.every((p) => p.alive)).toBe(true);
+      g = advanceRound(g);
+      expect(g.state.phase).toBe('bidding');
+    }
+  });
+
   it('advanceRound re-deals fresh hands and bumps the round in attrition', () => {
     let g = freshGame();
     g = applyBid(g, HUMAN_ID, { count: 1, face: 3, isZhai: false });

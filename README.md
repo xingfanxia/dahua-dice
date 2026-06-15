@@ -19,7 +19,8 @@ A 2-8 player Liar's Dice web app with animated 3D cube dice, gyroscope shake-to-
 - 🌐 **i18n** — zh-CN default + en, via `next-intl`.
 - 🔄 **Realtime multiplayer** via Upstash Redis + Vercel Fluid Compute SSE pipe (`/subscribe/{channel}` transparent stream). On reconnect the client refetches full room state (SSE `onopen` → refetch, plus a 3s safety poll), so a brief drop never loses sync.
 - 🎲 **Offline / solo mode** (`/solo`) — for playing face-to-face, each phone is a fair local dice cup: a button rolls a new hand that sits covered, then tap (or shake) to throw + reveal it and tap to cover again across the table; no room, no network. Rolls use `crypto.getRandomValues` locally (solo has no protocol adversary, unlike the server-authoritative multiplayer game).
-- 🤖 **vs Computer** (`/bot`) — a LOCAL single-device game against a probability-model bot (easy / medium / hard), reusing the same engine and UI; nothing leaves the device.
+- 🤖 **vs Computer** (`/bot`) — a LOCAL single-device game against a probability-model bot (easy / medium / hard, 3–10 dice, and any of the 4 settlement modes), reusing the same engine and UI; nothing leaves the device.
+- 🧭 **Onboarding & a readable reveal** — a 怎么玩 rules sheet from the home screen, a dismissible on-turn how-to memo, a「{bidder} 赌全场至少有 N 个 Y 点」reading under the standing call, and a **4-section reveal** that spells out the result causally (the opened bid → every hand with real/飞 highlights + per-player subtotals → 全场 total ≥/＜ the call → who loses & why, by settlement mode), so a correct outcome never reads as a bug.
 - 🏁 **Game-end house rules** — choose how a loss is handled in the lobby: 淘汰制 (lose a die, last player standing wins — default) · 聚会版 (no elimination, each round just names a loser) · 积分淘汰 (out after N total losses) · 计分赛 (fewest losses over K rounds).
 - 🥤 **Roll ritual** — one tap/shake gesture across solo, vs-computer, and rooms (`components/dice/MyHand`): each new hand sits covered, tap or shake to throw + reveal it with a 3D tumble (once — a re-peek just flips, no replay), tap to cover again. A persistent turn banner and a prominent current-call card keep the bidding readable.
 - 🔒 **Server-authoritative gameplay** — challenge / 劈 / 通杀 / round resolution runs in a **pure, unit-tested engine** (`lib/game-engine/round.ts`) computed in Node, then committed atomically via version-CAS Lua; bids/joins are atomic Lua mutations. Inputs are Zod-validated at the boundary and rate-limited (30/min/session); dice rolled with `crypto.randomInt`; private hands are server-only and auth-gated per player (never broadcast before reveal).
@@ -39,13 +40,13 @@ pnpm dev
 ## Test
 
 ```bash
-pnpm test            # 106 unit + integration tests (game engine, validation, round resolution, hand summary, bot policy + local game, dice gesture)
+pnpm test            # 120 unit + integration tests (game engine, validation, round resolution, hand summary, bot policy + local game + settlement modes, dice gesture, reveal stage, onboarding)
 pnpm test:coverage   # vitest + @vitest/coverage-v8
-pnpm e2e             # Playwright: happy-path, reconnect, extensions, player2-flow, full-game, solo, bot, 劈, palifico, axe a11y — chromium + webkit (mobile Safari)
+pnpm e2e             # Playwright: happy-path, reconnect, extensions, player2-flow, full-game, solo, bot (+ party mode), 劈, palifico, axe a11y (incl. rules sheet + bot setup) — chromium + webkit (mobile Safari)
 PLAYWRIGHT_PORT=3100 pnpm e2e   # use a free port if :3000 is taken by another dev server
 ```
 
-The e2e suite (34 tests across 2 projects) drives two browser contexts through create → join → start → **开盅** → bid → counter-bid → challenge → reveal → next round (incl. asserting each player sees their own dice), a **complete game to elimination → final results → rematch → lobby**, a 通杀 (sweep) extension journey, a mid-game reload re-sync, the **offline / solo dice-cup** flow (roll · tap-reveal/cover · dice-count), the **vs-computer** flow (start → bid → the bot responds), and `@axe-core` WCAG A/AA scans of the home / lobby / bidding / solo screens. It auto-starts a dev server (override the port with `PLAYWRIGHT_PORT`). First run needs the browsers: `pnpm exec playwright install chromium webkit`.
+The e2e suite (40 tests across 2 projects) drives two browser contexts through create → join → start → **开盅** → bid → counter-bid → challenge → reveal → next round (incl. asserting each player sees their own dice), a **complete game to elimination → final results → rematch → lobby**, a 通杀 (sweep) extension journey, a mid-game reload re-sync, the **offline / solo dice-cup** flow (roll · tap-reveal/cover · dice-count), the **vs-computer** flow (start → bid → the bot responds, plus a party-mode game → 结束本场 exit), and `@axe-core` WCAG A/AA scans of the home / lobby / bidding / solo / rules-sheet / bot-setup screens. It auto-starts a dev server (override the port with `PLAYWRIGHT_PORT`). First run needs the browsers: `pnpm exec playwright install chromium webkit`.
 
 ## Deploy
 
