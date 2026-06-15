@@ -44,19 +44,35 @@ export function PipDie({
   face,
   size = 24,
   highlighted = false,
+  tone = 'amber',
+  dimmed = false,
   className = '',
 }: {
   face: number;
   size?: number;
-  /** Amber accent — the dice that count toward the verified bid on reveal. */
+  /** Accent ring — the dice that count toward the verified bid on reveal. */
   highlighted?: boolean;
+  /** Highlight color: amber = a wild 1 standing in (飞), emerald = a real face match. */
+  tone?: 'amber' | 'emerald';
+  /** Fade a non-counting die on the reveal screen so the matches stand out. */
+  dimmed?: boolean;
   className?: string;
 }) {
   const pips = PIP_LAYOUT[face];
+  const ring = highlighted
+    ? tone === 'emerald'
+      ? 'ring-2 ring-emerald-500'
+      : 'ring-2 ring-amber-500'
+    : 'ring-1 ring-black/10';
+  const pipFill = highlighted
+    ? tone === 'emerald'
+      ? 'fill-emerald-600'
+      : 'fill-amber-500'
+    : 'fill-gray-900';
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-[24%] bg-white align-middle shadow-sm dark:bg-gray-100 ${
-        highlighted ? 'ring-2 ring-amber-500' : 'ring-1 ring-black/10'
+      className={`inline-flex shrink-0 items-center justify-center rounded-[24%] bg-white align-middle shadow-sm dark:bg-gray-100 ${ring} ${
+        dimmed ? 'opacity-40' : ''
       } ${className}`}
       style={{ width: size, height: size }}
       aria-hidden="true"
@@ -64,13 +80,7 @@ export function PipDie({
       {pips ? (
         <svg viewBox="0 0 100 100" className="h-[76%] w-[76%]" aria-hidden="true">
           {pips.map(([cx, cy]) => (
-            <circle
-              key={`${cx}-${cy}`}
-              cx={cx}
-              cy={cy}
-              r={11}
-              className={highlighted ? 'fill-amber-500' : 'fill-gray-900'}
-            />
+            <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={11} className={pipFill} />
           ))}
         </svg>
       ) : (

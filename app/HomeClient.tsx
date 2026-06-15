@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
+import { RulesSheet } from '@/components/game/RulesSheet';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
 import { ThemeModeToggle } from '@/components/theme/ThemeModeToggle';
 import { unlockAudio } from '@/lib/audio/howl-instance';
@@ -31,6 +32,7 @@ export function HomeClient({
   const [joinCode, setJoinCode] = useState(validInitialCode);
   const [busy, setBusy] = useState<'create' | 'join' | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [showRules, setShowRules] = useState(false);
 
   useEffect(() => {
     if (initialError === 'room_not_found') setErr(t('errors.roomNotFound'));
@@ -159,6 +161,16 @@ export function HomeClient({
           />
         </label>
 
+        {/* 三种玩法 guide bar (UX-4) — points a new player at the right entry below. */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            {t('home.playModesLabel')}
+          </span>
+          <GuideRow emoji="🌐" title={t('home.modeOnline')} desc={t('home.modeOnlineDesc')} />
+          <GuideRow emoji="🤖" title={t('home.modeBot')} desc={t('home.modeBotDesc')} />
+          <GuideRow emoji="🎲" title={t('home.modeSolo')} desc={t('home.modeSoloDesc')} />
+        </div>
+
         {/* create / join */}
         <div className="flex flex-col gap-3">
           <button
@@ -239,12 +251,32 @@ export function HomeClient({
           </div>
         </div>
 
-        {/* footer — language */}
+        {/* footer — rules entry + language */}
         <footer className="mt-auto flex flex-col items-center gap-3 pt-12">
+          <button
+            type="button"
+            onClick={() => setShowRules(true)}
+            className="rounded-full border border-gray-300 px-4 py-1.5 text-sm text-gray-600 dark:border-gray-600 dark:text-gray-300"
+          >
+            📖 {t('home.howToPlay')}
+          </button>
           <LanguageToggle label={t('common.language')} />
         </footer>
       </div>
+      <RulesSheet open={showRules} onClose={() => setShowRules(false)} />
     </main>
+  );
+}
+
+function GuideRow({ emoji, title, desc }: { emoji: string; title: string; desc: string }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl bg-white px-3 py-2 dark:bg-gray-800">
+      <span className="text-lg" aria-hidden>
+        {emoji}
+      </span>
+      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{title}</span>
+      <span className="flex-1 text-xs text-gray-500 dark:text-gray-400">{desc}</span>
+    </div>
   );
 }
 

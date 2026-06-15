@@ -3,9 +3,12 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { END_MODES, NumberStepper } from '@/components/customization/CustomizationDrawer';
 import { MyHand } from '@/components/dice/MyHand';
+import { BetInterpretation } from '@/components/game/BetInterpretation';
 import { BidChain } from '@/components/game/BidChain';
 import { BidPanel } from '@/components/game/BidPanel';
+import { OnboardHint } from '@/components/game/OnboardHint';
 import { PlayerRing } from '@/components/game/PlayerRing';
 import { RevealStage } from '@/components/game/RevealStage';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
@@ -22,7 +25,7 @@ import {
   isHumanTurn,
 } from '@/lib/bot/local-game';
 import type { BotDifficulty } from '@/lib/bot/policy';
-import { type Bid, DEFAULT_RULES, type GameRules } from '@/lib/game-engine/types';
+import { type Bid, DEFAULT_RULES, type EndMode, type GameRules } from '@/lib/game-engine/types';
 
 const DIFFICULTIES: BotDifficulty[] = ['easy', 'medium', 'hard'];
 // 3-10 = the GameRules.diceCount type range (the bot runs the real engine, so it
@@ -38,6 +41,9 @@ export function BotClient() {
 
   const [difficulty, setDifficulty] = useState<BotDifficulty>('medium');
   const [diceCount, setDiceCount] = useState<GameRules['diceCount']>(DEFAULT_RULES.diceCount);
+  const [endMode, setEndMode] = useState<EndMode>('attrition');
+  const [knockoutLosses, setKnockoutLosses] = useState(DEFAULT_RULES.knockoutLosses);
+  const [scoreRounds, setScoreRounds] = useState(DEFAULT_RULES.scoreRounds);
   const [game, setGame] = useState<BotGame | null>(null);
   const [thinking, setThinking] = useState(false);
   const [note, setNote] = useState<BotNote>(null);
@@ -57,10 +63,10 @@ export function BotClient() {
         humanAvatar: 'numeric',
         botNick: t('bot.cpu'),
         botAvatar: 'numeric',
-        rules: { ...DEFAULT_RULES, diceCount },
+        rules: { ...DEFAULT_RULES, diceCount, endMode, knockoutLosses, scoreRounds },
       }),
     );
-  }, [t, diceCount]);
+  }, [t, diceCount, endMode, knockoutLosses, scoreRounds]);
 
   // Drive the bot: whenever it's a bot's turn during bidding, think then act once.
   useEffect(() => {
@@ -103,7 +109,7 @@ export function BotClient() {
     setGame(advanceRound(g));
   }, []);
 
-  // Difficulty picker (pre-game / between games).
+  // Setup screen (pre-game / between games): difficulty + dice count + settlement mode.
   if (!game) {
     return (
       <Shell t={t} onBack={() => router.push('/')}>
@@ -155,6 +161,58 @@ export function BotClient() {
             ))}
           </div>
         </div>
+        {/* Settlement mode (UX-2) — the engine supports all 4 vs the bot; reuse the
+            multiplayer drawer's labels + stepper so the copy has one source. */}
+        <div className="flex flex-col gap-2.5 rounded-2xl bg-white p-4 dark:bg-gray-800">
+          <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            {t('bot.endMode')}
+          </span>
+          <div className="grid grid-cols-2 gap-2">
+            {END_MODES.map((m) => {
+              const active = endMode === m;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setEndMode(m)}
+                  aria-pressed={active}
+                  className={`flex min-h-[44px] flex-col gap-0.5 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                    active ? 'bg-red-600' : 'bg-gray-100 dark:bg-gray-700'
+                  }`}
+                >
+                  <span
+                    className={`text-sm font-medium ${active ? 'text-white' : 'text-gray-800 dark:text-gray-200'}`}
+                  >
+                    {t(`customization.endMode_${m}`)}
+                  </span>
+                  <span
+                    className={`text-xs ${active ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`}
+                  >
+                    {t(`customization.endMode_${m}_desc`)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {endMode === 'knockout' && (
+            <NumberStepper
+              label={t('customization.knockoutLosses')}
+              value={knockoutLosses}
+              min={1}
+              max={20}
+              onChange={setKnockoutLosses}
+            />
+          )}
+          {endMode === 'score' && (
+            <NumberStepper
+              label={t('customization.scoreRounds')}
+              value={scoreRounds}
+              min={1}
+              max={50}
+              onChange={setScoreRounds}
+            />
+          )}
+        </div>
         <button
           type="button"
           onClick={start}
@@ -162,6 +220,9 @@ export function BotClient() {
         >
           {t('bot.start')}
         </button>
+        <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+          {t('bot.rulesSummary', { mode: t(`customization.endMode_${endMode}`) })}
+        </p>
       </Shell>
     );
   }
@@ -185,7 +246,7 @@ export function BotClient() {
             : state.phase === 'game_end'
               ? t('game.gameEnded')
               : isHumanTurn(game)
-                ? t('game.yourTurn')
+                ? t('game.yourTurnHint')
                 : thinking
                   ? t('bot.thinking')
                   : t('game.playerTurn', { name: t('bot.cpu') })}
@@ -197,9 +258,13 @@ export function BotClient() {
           </p>
         )}
 
+        {state.phase === 'bidding' && isHumanTurn(game) && <OnboardHint />}
+
         <PlayerRing state={state} myPlayerId={HUMAN_ID} />
 
         {state.phase === 'bidding' && <BidChain state={state} />}
+
+        {state.phase === 'bidding' && state.lastBid && <BetInterpretation state={state} />}
 
         {/* The human's own dice — covered each round, tap / shake to throw + reveal
             (#8 ritual via MyHand). On reveal the hand shows in RevealStage instead. */}
@@ -225,13 +290,29 @@ export function BotClient() {
         )}
 
         {state.phase === 'reveal' && state.lastChallengeResult && (
-          <button
-            type="button"
-            onClick={onNext}
-            className="rounded-2xl bg-red-600 py-3 font-medium text-white"
-          >
-            {state.lastChallengeResult.gameEnded ? t('game.toFinalResult') : t('game.nextRound')}
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={onNext}
+              className="rounded-2xl bg-red-600 py-3 font-medium text-white"
+            >
+              {state.lastChallengeResult.gameEnded ? t('game.toFinalResult') : t('game.nextRound')}
+            </button>
+            {/* Party mode never auto-ends (finalize keeps gameEnded false), so without
+                this manual exit the player loops rounds forever. Returns to setup. */}
+            {state.rules.endMode === 'party' && !state.lastChallengeResult.gameEnded && (
+              <button
+                type="button"
+                onClick={() => {
+                  setNote(null);
+                  setGame(null);
+                }}
+                className="rounded-2xl border border-gray-300 py-3 font-medium text-gray-600 dark:border-gray-600 dark:text-gray-300"
+              >
+                {t('bot.endGame')}
+              </button>
+            )}
+          </div>
         )}
 
         {state.phase === 'game_end' && (

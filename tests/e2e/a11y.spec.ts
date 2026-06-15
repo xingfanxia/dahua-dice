@@ -46,10 +46,29 @@ test.describe('accessibility (axe)', () => {
     expect((await scan(page)).violations).toEqual([]);
   });
 
+  test('rules sheet (home) has no WCAG A/AA violations', async ({ page }) => {
+    // Covers the bottom-sheet contrast bumps (muted grays, amber/emerald accents)
+    // ported from the wxapp sibling — the axe pass is the real guard for them.
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: /怎么玩|How to play/ }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    expect((await scan(page)).violations).toEqual([]);
+  });
+
   test('lobby has no WCAG A/AA violations', async ({ page }) => {
     await createRoom(page, 'Alice');
     const results = await scan(page);
     expect(results.violations).toEqual([]);
+  });
+
+  test('bot setup screen has no WCAG A/AA violations', async ({ page }) => {
+    // The settlement-mode cards render 3 inactive descriptions by default (only
+    // attrition is active) — exactly the contrast-sensitive state, so a default scan
+    // covers it without any interaction.
+    await page.goto('/bot');
+    await page.waitForLoadState('networkidle');
+    expect((await scan(page)).violations).toEqual([]);
   });
 
   test('bidding screen has no WCAG A/AA violations', async ({ browser }) => {
