@@ -1,11 +1,20 @@
-# dahua-dice — Project Instructions
+# dahua-dice — agent guide
+
+## Project scale and verification
+
+**Profile: hobby multiplayer game.** Liar's Dice for small social games. Keep rolls server-authoritative and other players' dice private. Use focused rule/room tests for state changes and a rendered check for UI. Preserve existing reconnect behavior; new retry layers or anti-abuse systems need a concrete problem.
+
+- The requested behavior/questions define completion. Reviews are read-only unless fixes are requested; report unrelated findings briefly without adding tasks or test backfill.
+- Use the smallest existing check that proves the change. Add tests for a concrete regression or consequential boundary; do not impose blanket TDD, new coverage targets, full suites, plans or reviewers. Preserve configured CI and actual release gates; reuse still-valid results.
+- Keep the existing structure. Internal contract errors should be clear; add retries, fallbacks or compatibility layers only for an observed external failure or supported contract. Keep secrets private and inspect security only at boundaries changed by this task.
+- This section owns task scope and local verification effort; historical goals and broad test lists below do not automatically activate a workflow.
 
 > Project-specific instructions for AI agents working in this repo. Read `docs/specs/2026-05-21-dahua-dice-design.md` for the full design contract; this file is the "what to know in 60 seconds" extract.
 
 ## Identity
 
-- **Path**: `~/projects/side-projects/dahua-dice/` (NOT under `work/cl/`)
-- **Bucket**: `side-projects/` per `~/projects/CLAUDE.md` decision tree
+- **Path**: `~/projects/fun/dahua-dice/` (NOT under `work/cl/`)
+- **Bucket**: `fun/` per `~/projects/docs/agent/project-layout.md`
 - **GitHub**: `github.com/xingfanxia/dahua-dice` (public, personal account)
 - **Vercel project**: `panpanmao/dahua-dice` (**personal scope** — NEVER use `computelabs`)
 - **Production URL**: `https://dahua-dice.vercel.app` — PUBLIC (stable domain; protection is `all_except_custom_domains`, so only the per-deploy `dahua-dice-<hash>-panpanmao.vercel.app` URLs are SSO-walled)
@@ -151,7 +160,7 @@ Remaining (need a human / physical device — can't be done from a dev session):
 
 Planned (2026-06-11 — research done, NOT started):
 
-2. **微信小程序版** — friends-only 体验版路线（零备案/审核/版号；个人主体 15 体验成员 + 15 项目成员/appid）。开在**新 sibling repo** `~/projects/side-projects/dahua-dice-wxapp/`（infra 与 web 版零重叠：Taro 4 = React 18、云开发 CloudBase、`db.watch` 实时同步替代 SSE、`lib/game-engine/` 原样移植进云函数）。完整调研与架构映射：`docs/research/2026-06-11-wechat-miniprogram-port.md`；通用 playbook：`~/.claude/references/wechat-miniprogram-friends-only.md`。CloudBase skill 已装（`.claude/skills/cloudbase` → `.agents/skills/cloudbase`，`Skill(cloudbase)` 调用）。⚠ 注册普通小程序 + 工具类目，勿注册小游戏账号；游戏内永远零真钱元素。
+2. **微信小程序版** — friends-only 体验版路线（零备案/审核/版号；个人主体 15 体验成员 + 15 项目成员/appid）。sibling repo 当前在 `~/projects/fun/dahua-dice-wxapp/`（infra 与 web 版零重叠：Taro 4 = React 18、云开发 CloudBase、`db.watch` 实时同步替代 SSE、`lib/game-engine/` 原样移植进云函数）。完整调研与架构映射：`docs/research/2026-06-11-wechat-miniprogram-port.md`；通用 playbook：`~/.claude/references/wechat-miniprogram-friends-only.md`。CloudBase skill 已装（`.claude/skills/cloudbase` → `.agents/skills/cloudbase`，`Skill(cloudbase)` 调用）。⚠ 注册普通小程序 + 工具类目，勿注册小游戏账号；游戏内永远零真钱元素。
 
 Done (2026-06-14 — ported the wxapp UX-clarity batch to web; branch `feat/port-wxapp-ux-clarity`, 120 unit + 40 e2e green; wxapp commits 08c6ff1 / 6e09f3b / 8f473b6):
 

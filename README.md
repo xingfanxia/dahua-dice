@@ -59,7 +59,7 @@ vercel --prod --scope panpanmao   # personal scope — never the computelabs tea
 - [Design spec](docs/specs/2026-05-21-dahua-dice-design.md) — 22 sections: screens / data model / state machine / a11y (§12 visual system rewritten 2026-06-12 for the wxapp-aligned redesign)
 - [Implementation plan](docs/plans/2026-05-21-dahua-dice-plan.md) — 12 phases, ~60 tasks
 - [Research](docs/research/) — game rules / Upstash multiplayer / R3F+Rapier dice / Howler audio
-- `CLAUDE.md` — 60-second orientation for AI agents working in this repo
+- `AGENTS.md` — 60-second orientation for AI agents working in this repo
 
 ## Tech stack
 
