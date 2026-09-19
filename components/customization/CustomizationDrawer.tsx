@@ -6,7 +6,7 @@ import { LanguageToggle } from '@/components/i18n/LanguageToggle';
 import { type ThemeMode, useThemeMode } from '@/components/theme/ThemeProvider';
 import type { EndMode, GameRules } from '@/lib/game-engine/types';
 
-const END_MODES: EndMode[] = ['attrition', 'party', 'knockout', 'score'];
+export const END_MODES: EndMode[] = ['attrition', 'party', 'knockout', 'score'];
 
 const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -290,7 +290,7 @@ export function CustomizationDrawer({
   );
 }
 
-function NumberStepper({
+export function NumberStepper({
   label,
   value,
   min,

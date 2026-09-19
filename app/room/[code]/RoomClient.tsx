@@ -8,8 +8,10 @@ import { CustomizationDrawer } from '@/components/customization/CustomizationDra
 import { MyHand } from '@/components/dice/MyHand';
 import { PipDie } from '@/components/dice/PipDie';
 import { AvatarBadge } from '@/components/game/AvatarBadge';
+import { BetInterpretation } from '@/components/game/BetInterpretation';
 import { BidChain } from '@/components/game/BidChain';
 import { BidPanel } from '@/components/game/BidPanel';
+import { OnboardHint } from '@/components/game/OnboardHint';
 import { PlayerRing } from '@/components/game/PlayerRing';
 import { RevealStage } from '@/components/game/RevealStage';
 import { useRoomEvents } from '@/components/game/useRoomEvents';
@@ -700,6 +702,9 @@ function GameView({
         </p>
       )}
 
+      {/* Dismissible how-to memo on your turn (#UX-3, ported from the wxapp sibling). */}
+      {state.phase === 'bidding' && isMyTurn && amAlive && <OnboardHint />}
+
       <PlayerRing state={state} myPlayerId={myPlayerId} />
 
       {/* Current standing call (#11) — the most important info, shown big and always. */}
@@ -709,20 +714,23 @@ function GameView({
             {t('game.currentCall')}
           </span>
           {state.lastBid ? (
-            <div className="flex items-center gap-2">
-              <span className="num text-3xl font-bold text-gray-900 dark:text-gray-100">
-                {state.lastBid.count}
-              </span>
-              <span className="text-xl text-gray-400" aria-hidden>
-                ×
-              </span>
-              <PipDie face={state.lastBid.face} size={34} />
-              {state.lastBid.isZhai && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                  {t('game.zhai')}
+            <>
+              <div className="flex items-center gap-2">
+                <span className="num text-3xl font-bold text-gray-900 dark:text-gray-100">
+                  {state.lastBid.count}
                 </span>
-              )}
-            </div>
+                <span className="text-xl text-gray-400" aria-hidden>
+                  ×
+                </span>
+                <PipDie face={state.lastBid.face} size={34} />
+                {state.lastBid.isZhai && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                    {t('game.zhai')}
+                  </span>
+                )}
+              </div>
+              <BetInterpretation state={state} />
+            </>
           ) : (
             <span className="text-sm text-gray-500 dark:text-gray-400">
               {t('game.waitingFirstBid')}

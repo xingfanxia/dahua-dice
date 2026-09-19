@@ -281,6 +281,19 @@ export function BidPanel({
         )}
       </div>
 
+      {/* Per-button meaning subtext (UX-3, ported from the wxapp sibling) — aligned
+          to the two action buttons above so a new player knows what each does. */}
+      <div className="-mt-2 flex gap-3">
+        <span className="flex-1 text-center text-[11px] leading-tight text-gray-500 dark:text-gray-400">
+          {t('game.bidButtonHint')}
+        </span>
+        {state.lastBid && (
+          <span className="flex-1 text-center text-[11px] leading-tight text-gray-500 dark:text-gray-400">
+            {t('game.challengeButtonHint')}
+          </span>
+        )}
+      </div>
+
       {/* Challenge confirm — fat-finger / Space guard before the irreversible 开. */}
       {challengePending && state.lastBid && (
         <div
